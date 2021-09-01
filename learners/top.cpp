@@ -16,16 +16,17 @@ void loadIn(blockvec In[],  hls::stream<blockvec> &Inrows,const int LL,int ind){
 //Wcols: LL wblockvecs (each LN)
 //Crows: LN blockvecs (each batchsize)
 // void fw_l1(hls::stream<blockvec> &Inrows, float C[BSIZE/P][64/T][P][T],w1blockvec Wcols[], hls::stream<blockvec> &Crows, float a1_buf[L2][BSIZE], const int LL,const int LN) {
-void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, const int LL,const int LN) {
-#pragma HLS aggregate variable=Inrows
-#pragma HLS aggregate variable=Wcols
-#pragma HLS aggregate variable=Crows
+void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN) {
+	#pragma HLS aggregate variable=Inrows
+	#pragma HLS aggregate variable=Wcols
+	#pragma HLS aggregate variable=Crows
+	#pragma HLS aggregate variable=actder
 	#pragma HLS ARRAY_PARTITION variable=z1_buf dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z1_buf dim=4 complete
 
 	float z1_buf_local[BSIZE/P][L2/T][P][T];
-	#pragma HLS ARRAY_PARTITION_local variable=z1_buf_local dim=3 complete
-	#pragma HLS ARRAY_PARTITION_local variable=z1_buf_local dim=4 complete
+	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=3 complete
+	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=4 complete
 	partialsum: for(int k=0; k < LL; k++) {
 		blockvec tempA = Inrows.read();
 		w1blockvec tempB = Wcols[k];
@@ -40,14 +41,15 @@ void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], flo
 					for(int jj = 0; jj < T; jj++) {
 						#pragma HLS UNROLL
 						//#pragma HLS dependence variable=C inter false
-						z1_buf_local[i][j][ii][jj] = z1_buf_local[i][j][ii][jj] + tempA.a[i*P+ii] * tempB.a[j*T+jj];
+						z1_buf_local[i][j][ii][jj] += tempA.a[i*P+ii] * tempB.a[j*T+jj];
 					}
 				}
 			}
 		}
 	}
 	
-	//add bias
+	//add bias, find actder
+	
 	#ifndef __SYNTHESIS__
 	printf("\nz1_buf content:\n");//should be L2 rows, BSIZE columns
 	#endif
@@ -55,8 +57,10 @@ void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], flo
 		for(int jj = 0; jj < T; jj++) {
 			for(int i = 0; i < BSIZE/P; i++) {
 				#pragma HLS PIPELINE
+				#pragma HLS dependence variable=z1_buf_local inter false
 				for(int ii = 0; ii < P; ii++) {
 					z1_buf_local[i][j][ii][jj]+=bias[j*T+jj];
+					actder[j*T+jj].a[i*P+ii]=(z1_buf_local[i][j][ii][jj]>0)? 1:0;
 					z1_buf[i][j][ii][jj]=z1_buf_local[i][j][ii][jj];
 					#ifndef __SYNTHESIS__
 					printf("%.8f ",z1_buf_local[i][j][ii][jj]);
@@ -73,10 +77,10 @@ void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], flo
 	
 	for(int j = 0; j < LN/T; j++) {
 		for(int jj = 0; jj < T; jj++) {
-     #pragma HLS PIPELINE
 			blockvec tempC;
 			#pragma HLS aggregate variable=tempC
 			for(int i = 0; i < BSIZE/P; i++) {
+				#pragma HLS PIPELINE
 				for(int ii = 0; ii < P; ii++) {
 					tempC.a[i*P+ii]=z1_buf_local[i][j][ii][jj];
 				}
@@ -93,16 +97,19 @@ void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], flo
 //Wcols: LL wblockvecs (each LN)
 //Crows: LN blockvecs (each batchsize)
 void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2], float bias[],w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN) {
-#pragma HLS aggregate variable=Inrows
-#pragma HLS aggregate variable=Wcols
-#pragma HLS aggregate variable=Crows
+	#pragma HLS INLINE
+	#pragma HLS aggregate variable=Inrows
+	#pragma HLS aggregate variable=Wcols
+	#pragma HLS aggregate variable=Crows
 	// float C[BSIZE/P2][3/T2][P2][T2]={0};
 	#pragma HLS ARRAY_PARTITION variable=z2_buf dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z2_buf dim=4 complete
 
-	// float z2_buf_local[BSIZE/P2][L3/T2][P2][T2];
-	// #pragma HLS ARRAY_PARTITION_local variable=z2_buf_local dim=3 complete
-	// #pragma HLS ARRAY_PARTITION_local variable=z2_buf_local dim=4 complete
+	float z2_buf_local[BSIZE/P2][L3/T2][P2][T2];
+	#pragma HLS ARRAY_PARTITION variable=z2_buf_local dim=3 complete
+	#pragma HLS ARRAY_PARTITION variable=z2_buf_local dim=4 complete
+
+	#pragma HLS bind_storage variable=z2_buf_local type=RAM_2P impl=bram
 
 	partialsum: for(int k=0; k < LL; k++) {
 	blockvec tempA = Inrows.read();
@@ -111,13 +118,13 @@ void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2],
      #pragma HLS aggregate variable=tempB
 		for(int i = 0; i < BSIZE/P2; i++) {
 			for(int j = 0; j < LN/T2; j++) {
-			#pragma HLS PIPELINE
-			#pragma HLS dependence variable=z2_buf inter false
+				#pragma HLS PIPELINE
+				#pragma HLS dependence variable=z2_buf_local inter false
 				for(int ii = 0; ii < P2; ii++) {
 					#pragma HLS UNROLL
 					for(int jj = 0; jj < T2; jj++) { //3
 						#pragma HLS UNROLL
-						z2_buf[i][j][ii][jj] = z2_buf[i][j][ii][jj] + tempA.a[i*P2+ii] * tempB.a[j*T2+jj];
+						z2_buf_local[i][j][ii][jj] = z2_buf_local[i][j][ii][jj] + tempA.a[i*P2+ii] * tempB.a[j*T2+jj];
 					}
 				}
 			}
@@ -132,10 +139,11 @@ void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2],
 		for(int jj = 0; jj < T2; jj++) {
 			for(int i = 0; i < BSIZE/P2; i++) {
 				#pragma HLS PIPELINE
+				#pragma HLS dependence variable=z2_buf_local inter false
 				for(int ii = 0; ii < P2; ii++) {
-					z2_buf[i][j][ii][jj]+=bias[j*T+jj];
+					z2_buf_local[i][j][ii][jj]+=bias[j*T+jj];
 					#ifndef __SYNTHESIS__
-					printf("%.8f ",z2_buf[i][j][ii][jj]);
+					printf("%.8f ",z2_buf_local[i][j][ii][jj]);
 					#endif
 				}
 			}
@@ -148,13 +156,13 @@ void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2],
 	//write out to stream
 	for(int j = 0; j < LN/T2; j++) {
 		for(int jj = 0; jj < T2; jj++) {
-   			#pragma HLS PIPELINE
 			blockvec tempC;
 			#pragma HLS aggregate variable=tempC
 			for(int i = 0; i < BSIZE/P2; i++) {
+				#pragma HLS PIPELINE
 				for(int ii = 0; ii < P2; ii++) {
 					tempC.a[i*P2+ii]=z2_buf[i][j][ii][jj];
-					// z2_buf[i][j][ii][jj]=z2_buf_local[i][j][ii][jj];
+					z2_buf[i][j][ii][jj]=z2_buf_local[i][j][ii][jj];
 				}
 			}
 			Crows.write(tempC);
@@ -226,7 +234,7 @@ void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<
 // 	w3blockvec Wcols0, w3blockvec Wcols1, w3blockvec Wcols2, w3blockvec Wcols3,
 // 	w3blockvec Wcols4,w3blockvec Wcols5,w3blockvec Wcols6,w3blockvec Wcols7, hls::stream<blockvec> &Crows, 
 // 	float delt1_buf[BSIZE/Pb][L3/Tb][Pb][Tb], const int LL,const int LN,int ind) {
-void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2/T][P][T],float delt1_buf[BSIZE/P][L2/T][P][T], const int LL,const int LN){
+void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE/P][L2/T][P][T], const int LL,const int LN){
 	#pragma HLS aggregate variable=Inrows
 	// #pragma HLS aggregate variable=Wcols1s
 	#pragma HLS aggregate variable=Crows
@@ -239,6 +247,11 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2
 	#pragma HLS array_partition variable=Wcols type=cyclic  factor=8 
 	// w3blockvec * arraywq[8]; //the size+ #ports is equal to Tb
 
+	float delt1_buf_local[BSIZE/P][L2/T][P][T];
+	#pragma HLS ARRAY_PARTITION variable=delt1_buf_local dim=3 complete
+	#pragma HLS ARRAY_PARTITION variable=delt1_buf_local dim=4 complete
+	
+	#pragma HLS bind_storage variable=delt1_buf_local type=RAM_2P impl=bram
 
 	partialsum: for(int k=0; k < LL; k++) {
 		blockvec tempA = Inrows[k];
@@ -248,13 +261,13 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2
 		for(int i = 0; i < BSIZE/P; i++) {
 			for(int j = 0; j < LN/T; j++) {
 			#pragma HLS PIPELINE
-			#pragma HLS dependence variable=delt1_buf inter false
+			#pragma HLS dependence variable=delt1_buf_local inter false
 				for(int ii = 0; ii < P; ii++) {
-					#pragma HLS UNROLL
+					// #pragma HLS UNROLL
 					for(int jj = 0; jj < T; jj++) { //3
-						#pragma HLS UNROLL
+						// #pragma HLS UNROLL
 						// delt1_buf[i][j][ii][jj] = delt1_buf[i][j][ii][jj] + tempA.a[i*Pb+ii] * (*arraywq[j*Tb+jj]).a[k]; //*arraywq: because wcols partitioned in cyclic manner, adjacent indices are in different banks
-						delt1_buf[i][j][ii][jj] = delt1_buf[i][j][ii][jj] + tempA.a[i*P+ii] * (Wcols[j*T+jj]).a[k];
+						delt1_buf_local[i][j][ii][jj] = delt1_buf_local[i][j][ii][jj] + tempA.a[i*P+ii] * (Wcols[j*T+jj]).a[k];
 					}
 				}
 			}
@@ -267,7 +280,7 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2
 		for(int jj = 0; jj < T; jj++) {
 			for(int i = 0; i < BSIZE/P; i++) {
 				for(int ii = 0; ii < P; ii++) {
-					printf("%.8f ",delt1_buf[i][j][ii][jj]);
+					printf("%.8f ",delt1_buf_local[i][j][ii][jj]);
 				}
 			}
 			printf("\n");
@@ -275,20 +288,22 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2
 		}
 	}
 	#endif
-	for(int i = 0; i < BSIZE/P; i++) {
-		for(int j = 0; j < LN/T; j++) {
-		#pragma HLS PIPELINE
-			for(int ii = 0; ii < P; ii++) {
-				#pragma HLS UNROLL
-				for(int jj = 0; jj < T; jj++) { //3
-					#pragma HLS UNROLL
-					// delt1_buf[i][j][ii][jj] = delt1_buf[i][j][ii][jj] + tempA.a[i*Pb+ii] * (*arraywq[j*Tb+jj]).a[k]; //*arraywq: because wcols partitioned in cyclic manner, adjacent indices are in different banks
+
+	for(int j = 0; j < LN/T; j++) { 
+		for(int jj = 0; jj < T; jj++) {
+			for(int i = 0; i < BSIZE/P; i++) {
+				#pragma HLS PIPELINE
+				// #pragma HLS dependence variable=z1_buf_local inter false
+				for(int ii = 0; ii < P; ii++) {
 					// delt times z1 relu derivative
-					delt1_buf[i][j][ii][jj] = (z1_buf[i][j][ii][jj]>0)? delt1_buf[i][j][ii][jj]:0;
+					// delt1_buf_local[i][j][ii][jj] = (z1_buf[i][j][ii][jj]>0)? delt1_buf[i][j][ii][jj]:0;
+					delt1_buf_local[i][j][ii][jj] = (actder[j*T+jj].a[i*P+ii]!=0)? delt1_buf[i][j][ii][jj]:0;
+					delt1_buf[i][j][ii][jj] = delt1_buf_local[i][j][ii][jj];
 				}
 			}
 		}
 	}
+
 	#ifndef __SYNTHESIS__
 	printf("\ndelt1_buf content after z1:\n\n");//should be L3 rows, BSIZE columns
 	for(int j = 0; j < LN/T; j++) { //this factor consistent with a1_buf partition
@@ -389,31 +404,34 @@ void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],flo
 	}
 	#endif
 	blockvec outpipe6[L3];
-	for(int ind=0; ind<1; ind++){
+
 		float z1_buf[BSIZE/P][L2/T][P][T]={0};
 		float z2_buf[BSIZE/P2][L3/T2][P2][T2]={0};
+		bsbit actder[L2]={0};
+	for(int ind=0; ind<1; ind++){
+
 		
-		{
-		#pragma HLS DATAFLOW
-		loadIn(A, inpipe, L1,ind);
-		fw_l1(inpipe, z1_buf, bias1, w1bram, outpipe[0], L1,L2);
-	  	activation(outpipe[0], outpipe[1],L2);
-		fw_l2(outpipe[1], z2_buf, bias2,w2bram, outpipe[2],L2,L3);
-		
-		// consistent with python golden tb
-		for (int i = 0; i < L3; i++){
-			blockvec tmpt;
-			for (int j = 0; j < BSIZE; j++){
-			#pragma HLS PIPELINE
-				tmpt.a[j]=i+2;
+		// {
+			#pragma HLS DATAFLOW
+			loadIn(A, inpipe, L1,ind);
+			fw_l1(inpipe, z1_buf, bias1, w1bram, outpipe[0], actder,L1,L2);
+		  	activation(outpipe[0], outpipe[1],L2);
+			fw_l2(outpipe[1], z2_buf, bias2,w2bram, outpipe[2],L2,L3);
+			
+			// consistent with python golden tb
+			for (int i = 0; i < L3; i++){
+				blockvec tmpt;
+				for (int j = 0; j < BSIZE; j++){
+				#pragma HLS PIPELINE
+					tmpt.a[j]=i+2;
+				}
+				outpipe[5].write(tmpt);
 			}
-			outpipe[5].write(tmpt);
-		}
-		objctv(r, acts, outpipe[2],outpipe[5],outpipe6, delt2_buf);
-		
-		// sub_backmm2(hls::stream<blockvec> &Inrows, w3blockvec Wcols[], float z1_buf[BSIZE/P][64/T][P][T],float delt1_buf[BSIZE/P][64/T][P][T], const int LL,const int LN) {
-		sub_backmm2(outpipe6, w2bram, z1_buf,delt1_buf, L3,L2);
-		}
+			objctv(r, acts, outpipe[2],outpipe[5],outpipe6, delt2_buf);
+			
+			// sub_backmm2(hls::stream<blockvec> &Inrows, w3blockvec Wcols[], float z1_buf[BSIZE/P][64/T][P][T],float delt1_buf[BSIZE/P][64/T][P][T], const int LL,const int LN) {
+			sub_backmm2(outpipe6, w2bram, actder, delt1_buf, L3,L2);
+		// }
 	}
 }
 
@@ -425,6 +443,7 @@ void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],flo
 void learners_top(blockvec *S){
 	w1blockvec w1bram[L1]; //w1
 	w3blockvec w2bram[L2]; //w2
+	#pragma HLS bind_storage variable=w2bram type=RAM_2P impl=bram
 
 //	Init on-chip memory
 	

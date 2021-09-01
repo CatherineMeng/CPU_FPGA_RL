@@ -1,6 +1,7 @@
 
 #include "hls_stream.h"
 #include "hls_math.h"
+#include "ap_fixed.h"
 #include <iostream>
 #include <iomanip>
 #include <vector>
@@ -18,6 +19,12 @@ const int L1 = 8;
 const int L2 = 64;
 const int L3 = 4;
 
+typedef ap_fixed<1,1> sglbit;
+
+
+typedef struct {
+	sglbit a[BSIZE];
+} bsbit;
 
 //hardware parameters
 //PE array dimensions: FW
@@ -143,7 +150,8 @@ typedef struct {
 
 void loadIn(blockvec In[],  hls::stream<blockvec> &Inrows,const int LL,int ind);
 //void loadW(w1blockvec W[], hls::stream<blockvec> &Wcols, int LL);
-void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, const int LL,const int LN);
+// void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, const int LL,const int LN);
+void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
 void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2], float bias[],w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
 void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,blockvec outs[],float delt2_buf[BSIZE][L3]);
 // void sub_backmm2(hls::stream<blockvec> &Inrows, 
@@ -151,7 +159,8 @@ void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<
 // 	w3blockvec Wcols4,w3blockvec Wcols5,w3blockvec Wcols6,w3blockvec Wcols7, hls::stream<blockvec> &Crows, 
 // 	float z2_buf[BSIZE/Pb][L3/Tb][Pb][Tb], const int LL,const int LN,int ind);
 // void activation(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
-vvoid sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2/T][P][T],float delt1_buf[BSIZE/P][L2/T][P][T], const int LL,const int LN);
+// vvoid sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], float z1_buf[BSIZE/P][L2/T][P][T],float delt1_buf[BSIZE/P][L2/T][P][T], const int LL,const int LN);
+void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE/P][L2/T][P][T], const int LL,const int LN);
 void actderiv(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
 void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);
 void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float a0_buf[L1][BSIZE],float a1_buf[L2][BSIZE],float delt2_buf[BSIZE][L3],float delt1_buf[BSIZE/P][64/T][P][T]);
