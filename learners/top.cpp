@@ -24,7 +24,7 @@ void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], flo
 	#pragma HLS ARRAY_PARTITION variable=z1_buf dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z1_buf dim=4 complete
 
-	float z1_buf_local[BSIZE/P][L2/T][P][T];
+	float z1_buf_local[BSIZE/P][L2/T][P][T]={0};
 	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=4 complete
 	partialsum: for(int k=0; k < LL; k++) {
@@ -105,7 +105,7 @@ void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2],
 	#pragma HLS ARRAY_PARTITION variable=z2_buf dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z2_buf dim=4 complete
 
-	float z2_buf_local[BSIZE/P2][L3/T2][P2][T2];
+	float z2_buf_local[BSIZE/P2][L3/T2][P2][T2]={0};
 	#pragma HLS ARRAY_PARTITION variable=z2_buf_local dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z2_buf_local dim=4 complete
 
@@ -161,7 +161,7 @@ void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2],
 			for(int i = 0; i < BSIZE/P2; i++) {
 				#pragma HLS PIPELINE
 				for(int ii = 0; ii < P2; ii++) {
-					tempC.a[i*P2+ii]=z2_buf[i][j][ii][jj];
+					tempC.a[i*P2+ii]=z2_buf_local[i][j][ii][jj];
 					z2_buf[i][j][ii][jj]=z2_buf_local[i][j][ii][jj];
 				}
 			}
@@ -208,12 +208,21 @@ void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<
 			if (i==action.a[j])
 			{
 				float actder=(tmpq.a[j]>0)? 1:0; //relu derivative
+				#ifndef __SYNTHESIS__
+				printf("\ntmpq.a[%d]:%f",j,tmpq.a[j]);
+				#endif
 				tmpobj.a[j]=2*(tmpq.a[j]-r.a[j]*argmax_tq.a[j])*actder;
+				#ifndef __SYNTHESIS__
+				printf("\nnode %d, tmpobj.a[%d]:%f",i,j,tmpobj.a[j]);
+				#endif
 			}
 			else
 				tmpobj.a[j]=0;
 			//write to delt2_buf
 			delt2_buf[j][i]=tmpobj.a[j];
+			#ifndef __SYNTHESIS__
+			if(delt2_buf[j][i]!=0)printf("\ndelt2_buf[%d][%d]:%f",j,i,delt2_buf[j][i]);
+			#endif
 		}
 		outs[i]=(tmpobj);
 	}
@@ -247,7 +256,7 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float d
 	#pragma HLS array_partition variable=Wcols type=cyclic  factor=8 
 	// w3blockvec * arraywq[8]; //the size+ #ports is equal to Tb
 
-	float delt1_buf_local[BSIZE/P][L2/T][P][T];
+	float delt1_buf_local[BSIZE/P][L2/T][P][T]={0};
 	#pragma HLS ARRAY_PARTITION variable=delt1_buf_local dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=delt1_buf_local dim=4 complete
 	
@@ -297,7 +306,7 @@ void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float d
 				for(int ii = 0; ii < P; ii++) {
 					// delt times z1 relu derivative
 					// delt1_buf_local[i][j][ii][jj] = (z1_buf[i][j][ii][jj]>0)? delt1_buf[i][j][ii][jj]:0;
-					delt1_buf_local[i][j][ii][jj] = (actder[j*T+jj].a[i*P+ii]!=0)? delt1_buf[i][j][ii][jj]:0;
+					delt1_buf_local[i][j][ii][jj] = (actder[j*T+jj].a[i*P+ii]!=0)? delt1_buf_local[i][j][ii][jj]:0;
 					delt1_buf[i][j][ii][jj] = delt1_buf_local[i][j][ii][jj];
 				}
 			}
