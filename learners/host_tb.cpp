@@ -4,15 +4,17 @@
 #define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 
-#define DATA_SIZE 16
-#define OUT_SIZE 4
+#define In_dim 8
+#define W1_out_dim 8
+#define W2_out_dim 64
+#define action_space_dim 4
 
 #include <vector>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
 #include <CL/cl2.hpp>
-#include "./block.h"
+#include "./block_new.h"
 
 // Forward declaration of utility functions included at the end of this file
 std::vector<cl::Device> get_xilinx_devices();
@@ -26,6 +28,22 @@ const int pc[MAX_HBM_PC_COUNT] = {
     PC_NAME(8),  PC_NAME(9),  PC_NAME(10), PC_NAME(11), PC_NAME(12), PC_NAME(13), PC_NAME(14), PC_NAME(15)};
 
 
+template <typename T1>
+struct aligned_allocator
+{
+  using value_type = T1;
+  T1* allocate(std::size_t num)
+  {
+    void* ptr = nullptr;
+    if (posix_memalign(&ptr,4096,num*sizeof(T1)))
+      throw std::bad_alloc();
+    return reinterpret_cast<T1*>(ptr);
+  }
+  void deallocate(T1* p, std::size_t num)
+  {
+    free(p);
+  }
+};
 // ------------------------------------------------------------------------------------
 // Main program
 // ------------------------------------------------------------------------------------
@@ -50,9 +68,20 @@ int main(int argc, char **argv)
     // ------------------------------------------------------------------------------------
     // Step 2: Create buffers and initialize test values
     // ------------------------------------------------------------------------------------
-    //DATA_SIZE=BATCH SIZE
-    std::vector<blockvec> In_rows(DATA_SIZE);
-    // std::vector<blockvec> C_rows(DATA_SIZE);
+    //In_dim=BATCH SIZE
+    // learners_top(blockvec *S, blockvec *Snt, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync)
+    std::vector<blockvec, aligned_allocator<blockvec>> In_rows;
+    In_rows.resize(In_dim);
+    // std::vector<blockvec> In_rows_snt(In_dim);
+    std::vector<blockvec, aligned_allocator<blockvec>> In_rows_snt;
+    In_rows_snt.resize(In_dim);
+    // std::vector<w1blockvec> Out_w1bram(W1_out_dim);
+    std::vector<w1blockvec, aligned_allocator<w1blockvec>> Out_w1bram;
+    Out_w1bram.resize(W1_out_dim);
+    // std::vector<w3blockvec> Out_w2bram(W2_out_dim);
+    std::vector<w3blockvec, aligned_allocator<w3blockvec>> Out_w2bram;
+    Out_w2bram.resize(W2_out_dim);
+    // std::vector<blockvec> C_rows(In_dim);
 
     printf("here 1\n");
     
@@ -64,6 +93,7 @@ int main(int argc, char **argv)
     for (i = 0; i < BSIZE; i++) {
         for (j = 0; j < L1; j++) {
             In_rows[j].a[i] = float(-j)/float(4.0);
+            In_rows_snt[j].a[i] = float(j)/float(4.0);
             printf("%f ",In_rows[j].a[i]);
 
         }
@@ -72,62 +102,88 @@ int main(int argc, char **argv)
   printf("inied\n");
     
     cl_mem_ext_ptr_t InrExt;
-    // cl_mem_ext_ptr_t CrExt;
+    cl_mem_ext_ptr_t InrExt2;
+    cl_mem_ext_ptr_t OutExt;
+    cl_mem_ext_ptr_t OutExt2;
     
 
     InrExt.obj = In_rows.data();
     InrExt.param = 0;
     InrExt.flags = 0|XCL_MEM_TOPOLOGY;
 
+    InrExt2.obj = In_rows_snt.data();
+    InrExt2.param = 0;
+    InrExt2.flags = 0|XCL_MEM_TOPOLOGY;
+
+    OutExt.obj = Out_w1bram.data();
+    OutExt.param = 0;
+    OutExt.flags = 0|XCL_MEM_TOPOLOGY;
+
+    OutExt2.obj = Out_w2bram.data();
+    OutExt2.param = 0;
+    OutExt2.flags = 0|XCL_MEM_TOPOLOGY;
+
     // CrExt.obj = C_rows.data();
     // CrExt.param = 0;
     // CrExt.flags = 1|XCL_MEM_TOPOLOGY;
-
+    int wsync = 0;
   printf("flags set\n");
     // Create the buffers and allocate memory
-    cl::Buffer in1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * DATA_SIZE, &InrExt, &err);
-    // cl::Buffer out_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_WRITE_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * DATA_SIZE, &CrExt, &err);
+    cl::Buffer in1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim, &InrExt, &err);
+    cl::Buffer in2_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim, &InrExt2, &err);
+    cl::Buffer out1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_WRITE_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(w1blockvec) * W1_out_dim, &OutExt, &err);
+    cl::Buffer out2_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_WRITE_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(w3blockvec) * W2_out_dim, &OutExt2, &err);
       printf("hi\n");
     // Set kernel arguments
     krnl_top.setArg(0, in1_buf);
-    // krnl_top.setArg(1, out_buf);
+    krnl_top.setArg(1, in2_buf);
+    krnl_top.setArg(2, out1_buf);
+    krnl_top.setArg(3, out2_buf);
+    krnl_top.setArg(4, wsync);
 
     // Map host-side buffer memory to user-space pointers [replaced, used equeueMapBuffer]
-    //blockvec *A = (blockvec *)q.enqueueMapBuffer(in1_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockvec) * DATA_SIZE);
-    //blockvec *B = (blockvec *)q.enqueueMapBuffer(in2_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockvec) * DATA_SIZE);
-    //blockmat *C = (blockmat *)q.enqueueMapBuffer(out_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockmat) * OUT_SIZE);
-    //std::vector<blockvec> A(DATA_SIZE);
-    //std::vector<blockvec> B(DATA_SIZE);
-    //std::vector<blockmat> C(OUT_SIZE);
+    //blockvec *A = (blockvec *)q.enqueueMapBuffer(in1_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockvec) * In_dim);
+    //blockvec *B = (blockvec *)q.enqueueMapBuffer(in2_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockvec) * In_dim);
+    //blockmat *C = (blockmat *)q.enqueueMapBuffer(out_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockmat) * W1_out_dim);
+    //std::vector<blockvec> A(In_dim);
+    //std::vector<blockvec> B(In_dim);
+    //std::vector<blockmat> C(W1_out_dim);
     
       printf("setArg finished\n");
 
-    FILE *fp3;
-    fp3=fopen("./IOnkernel.dat","w");
+    // FILE *fp3;
+    // fp3=fopen("./IOnkernel.dat","w");
 
-    for (j = 0; j < L1; j++) {
-        for (i = 0; i < BSIZE; i++) {
-            fprintf(fp3,"%f ",In_rows[j].a[i]);
-        }
-        fprintf(fp3,"\n");
-    }
+    // for (j = 0; j < L1; j++) {
+    //     for (i = 0; i < BSIZE; i++) {
+    //         fprintf(fp3,"%f ",In_rows[j].a[i]);
+    //     }
+    //     fprintf(fp3,"\n");
+    // }
 
-    fclose(fp3);
+    // fclose(fp3);
     printf("starting kernel\n");
     // ------------------------------------------------------------------------------------
     // Step 3: Run the kernel
     // ------------------------------------------------------------------------------------
 
     krnl_top.setArg(0, in1_buf);
+    krnl_top.setArg(1, in2_buf);
+    krnl_top.setArg(2, out1_buf);
+    krnl_top.setArg(3, out2_buf);
+    krnl_top.setArg(4, wsync);
     // krnl_top.setArg(1, out_buf);
     printf("setArg\n");
     // Schedule transfer of inputs to device memory, execution of kernel, and transfer of outputs back to host memory
     q.enqueueMigrateMemObjects({in1_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in2_buf}, 0 /* 0 means from host*/);
     printf("sent data\n");
     q.enqueueTask(krnl_top);
     // q.finish();
+    
+    q.enqueueMigrateMemObjects({out1_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out2_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
     printf("executed kernel\n");
-    // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
     // printf("data back\n");
 
     // Wait for all scheduled operations to finish
