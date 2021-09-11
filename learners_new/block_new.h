@@ -25,6 +25,11 @@ using namespace std;
 #define L2 64
 #define L3 4
 
+#define a0depth (BSIZE * 5)
+#define a1depth (BSIZE * 3)
+#define actderdepth (L2 * 3)
+// #define delt2depth (BSIZE)
+
 typedef ap_fixed<1,1> sglbit;
 
 
@@ -160,25 +165,29 @@ typedef struct {
 //	float out[BLOCK_SIZE][BLOCK_SIZE];
 //} blockmat;
 
-void loadIn(blockvec In[],  a0blockvec a0_buf[BSIZE],hls::stream<blockvec> &Inrows,const int LL,int ind);
-//void loadW(w1blockvec W[], hls::stream<blockvec> &Wcols, int LL);
-// void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, const int LL,const int LN);
-// void fw_l1(hls::stream<blockvec> &Inrows, float z1_buf[BSIZE/P][L2/T][P][T], float bias[], w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
-// void fw_l1(hls::stream<blockvec> &Inrows, w1blockvec a1_buf[BSIZE],float bias[L2], w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
+// void loadIn(blockvec In[],  a0blockvec a0_buf[BSIZE],hls::stream<blockvec> &Inrows,const int LL,int ind);
+void loadIn(blockvec In[],  hls::stream<a0blockvec> a0_buf_fifo,hls::stream<blockvec> &Inrows,const int LL,int ind);
+void loadSn(blockvec In[], hls::stream<blockvec> &Inrows,const int LL,int ind);
 void fw_l1(hls::stream<blockvec> &Inrows, w1blockvec a1_buf[BSIZE],w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
-// void fw_l2(hls::stream<blockvec> &Inrows, float z2_buf[BSIZE/P2][L3/T2][P2][T2], float bias[],w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
-// void fw_l2(hls::stream<blockvec> &Inrows, float bias[],w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
 void fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias,w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
 // void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,blockvec outs[],float delt2_buf[BSIZE][L3]);
-void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
+// void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
+void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
 // void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE][L2], const int LL,const int LN);
 void sub_backmm2(blockvec Inrows[], w1blockvec Wcols[], bsbit actder[L2],w1blockvec delt1_buf[BSIZE], const int LL,const int LN);
 void actderiv(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
 void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float a0_buf[L1][BSIZE],float a1_buf[L2][BSIZE],float delt2_buf[BSIZE][L3],float delt1_buf[BSIZE][L2]);
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],w1blockvec bias1,w3blockvec bias2,float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],w1blockvec bias1,w3blockvec bias2,float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
+	w1blockvec w1bram[],w3blockvec w2bram[], w1blockvec w1bram_t[],w3blockvec w2bram_t[], 
+	w1blockvec bias1,w3blockvec bias2,w1blockvec bias1_t,w3blockvec bias2_t,
+	float gamma, float alpha,
+	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
 
-void learners_top(blockvec *S, blockvec *Snt, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
+
+// void learners_top(blockvec *S, blockvec *Snt, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
 }
 
