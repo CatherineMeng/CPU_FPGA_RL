@@ -63,6 +63,76 @@ typedef struct {
 #define T4 4 //L3
 
 
+typedef struct {
+	float a[BSIZE];
+} blockvec;
+
+typedef struct {
+	int a[BSIZE];
+} actvec;
+
+typedef struct {
+	float a[L2];
+} w1blockvec; //also used for delta1 and a1
+typedef struct {
+	float a[L3];
+} w3blockvec; //also used for delta2
+
+typedef struct {
+	float a[L1];
+} a0blockvec;
+
+typedef struct {
+	float a[P3][T3];
+} w1blocks;
+
+typedef struct {
+	float a[P4][T4];
+} w2blocks;
+//typedef struct {
+//	float a[L4];
+//} w3blockvec;
+//typedef struct {
+//	float out[BLOCK_SIZE][BLOCK_SIZE];
+//} blockmat;
+
+// void loadIn(blockvec In[],  a0blockvec a0_buf[BSIZE],hls::stream<blockvec> &Inrows,const int LL,int ind);
+void loadIn(blockvec In[],  hls::stream<a0blockvec> &a0_buf_fifo,hls::stream<blockvec> &Inrows,const int LL,int ind);
+void loadSn(blockvec In[], hls::stream<blockvec> &Inrows,const int LL,int ind);
+// void fw_l1(hls::stream<blockvec> &Inrows, w1blockvec a1_buf[BSIZE],w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
+// void fw_l1(hls::stream<blockvec> &Inrows, w1blockvec a1_buf[BSIZE],w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, hls::stream<bsbit> &actder_fifo,const int LL,const int LN);
+void fw_l1(hls::stream<blockvec> &Inrows, hls::stream<w1blockvec> &a1_buf_fifo, w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, hls::stream<bsbit> &actder_fifo,const int LL,const int LN);
+void fw_l1_targ(hls::stream<blockvec> &Inrows,  w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, const int LL,const int LN);
+void fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias,w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
+// void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,blockvec outs[],float delt2_buf[BSIZE][L3]);
+// void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
+// void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
+void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo);
+// void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE][L2], const int LL,const int LN);
+// void sub_backmm2(blockvec Inrows[], w1blockvec Wcols[], bsbit actder[L2],w1blockvec delt1_buf[BSIZE], const int LL,const int LN);
+void sub_backmm2(hls::stream<blockvec> &Inrows, w1blockvec Wcols[], hls::stream<bsbit> &actder_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, const int LL,const int LN);
+
+void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3]);
+void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4]);
+
+void actderiv(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
+void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);
+// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float a0_buf[L1][BSIZE],float a1_buf[L2][BSIZE],float delt2_buf[BSIZE][L3],float delt1_buf[BSIZE][L2]);
+// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],w1blockvec bias1,w3blockvec bias2,float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
+	w1blockvec w1bram[],w3blockvec w2bram[], w1blockvec w1bram_t[],w3blockvec w2bram_t[], 
+	w1blockvec bias1,w3blockvec bias2,w1blockvec bias1_t,w3blockvec bias2_t,
+	float gamma, 
+	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
+void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
+
+void test_target(hls::stream<blockvec> &outpipe3);
+
+// void test_fw_l2(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Crows);
+void test_fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias, w3blockvec Wcols[],  hls::stream<blockvec> &Crows);
+
+
 const float w1list[L1][L2]={{0.09915440529584885,-0.8309909701347351,0.13474726676940918,0.5200338363647461,0.48192429542541504,0.035555850714445114,0.051557619124650955,-0.28794270753860474,-0.4198712706565857,0.47878023982048035,-0.01150917075574398,0.20277462899684906,-0.08225031942129135,0.3318197429180145,-0.125244140625,0.27792811393737793,0.3145216703414917,-0.3707144260406494,-0.0437040850520134,0.16427592933177948,-0.395137220621109,0.2238987684249878,0.14374248683452606,0.13287387788295746,-0.11609049886465073,0.19251202046871185,-0.6004387140274048,0.24150680005550385,-0.26290208101272583,-0.040665119886398315,0.003040146781131625,0.4833458662033081,-0.3267051577568054,-0.24715998768806458,0.133119136095047,-0.13170768320560455,0.25504955649375916,0.31076404452323914,-0.03626742586493492,0.10338196158409119,0.20394128561019897,0.3194485604763031,-0.28020772337913513,0.076445572078228,0.04087008163332939,-0.04186327010393143,-0.448120653629303,0.26069989800453186,-0.05521703138947487,0.3642311692237854,0.26647427678108215,-0.3300744593143463,0.535096287727356,0.6776754856109619,0.24327489733695984,0.1575140506029129,-0.04243846982717514,-0.4964044988155365,-0.22224193811416626,-0.3914795517921448,-0.24925018846988678,0.224340558052063,-0.6668941974639893,-0.3923123776912689},
 {0.29402482509613037,-0.9124258756637573,0.3868218660354614,0.15521517395973206,0.3627452254295349,0.1945621818304062,-0.05356447398662567,-0.7290803790092468,-0.40737491846084595,-0.06972579658031464,0.5093024373054504,-0.1072436198592186,0.5642536282539368,0.22090131044387817,0.5055398344993591,0.10796497017145157,-0.11692631989717484,0.04013124853372574,0.13325399160385132,0.21380500495433807,-0.1611955314874649,-0.2943866550922394,0.2821629047393799,-0.5286908149719238,-0.07214821875095367,-0.19923631846904755,-0.12820714712142944,0.05931665003299713,-0.13442353904247284,-0.2754851281642914,-0.11323124170303345,-0.3667425513267517,0.03932627663016319,0.3275429606437683,0.47407254576683044,-0.9340253472328186,0.1975119709968567,0.30425944924354553,-0.19112633168697357,-0.3640998601913452,-0.6373295187950134,-0.2897416055202484,-0.6274580955505371,-0.27683424949645996,0.3310238718986511,0.33827605843544006,-0.2314598709344864,0.20969133079051971,0.30090540647506714,0.18265189230442047,0.6124370694160461,0.02167748101055622,-0.06957324594259262,0.4615097939968109,-0.2425176203250885,0.09540935605764389,-0.2902863621711731,-0.3907780349254608,0.3408726751804352,0.09108509123325348,-0.7972047924995422,0.9296848177909851,-0.802964985370636,0.23137196898460388},
 {-0.37352311611175537,0.28179872035980225,0.3858104348182678,-0.5339908003807068,0.0900442972779274,0.41252848505973816,0.4958907663822174,0.4973900616168976,0.1033104732632637,-0.2689152956008911,0.014870917424559593,-0.5497537851333618,0.30827853083610535,-0.06827765703201294,0.5602136850357056,-0.3666709363460541,-0.4393084943294525,-0.23005343973636627,-0.3604196608066559,-0.22145211696624756,-0.29811564087867737,-0.42761489748954773,-0.04393099993467331,0.19725771248340607,0.28327298164367676,0.1081341877579689,0.6643447279930115,-0.12907177209854126,-0.039714161306619644,-0.15272729098796844,0.016995809972286224,-0.512271523475647,-0.060260944068431854,0.07478131353855133,0.39070019125938416,0.4271097481250763,-0.3438448905944824,-0.16565744578838348,0.6141490936279297,0.25293394923210144,-0.32208627462387085,-0.20217138528823853,0.31227609515190125,-0.4444103538990021,0.31543442606925964,0.42581382393836975,-0.380502849817276,0.5807292461395264,0.014070669189095497,-0.4794534146785736,-0.2946072816848755,0.40890058875083923,0.36513784527778625,-0.5256085991859436,0.5445166826248169,0.5455231070518494,-0.15579883754253387,0.18869075179100037,0.34308308362960815,0.6005241274833679,-0.17468447983264923,-0.13289466500282288,0.4793927073478699,-0.1427803784608841},
@@ -139,55 +209,6 @@ const float w2list_or[L2][2]={{-0.4689616858959198,-0.4767073094844818},
 
 float bias1_list[L2]={-1.1225467920303345,-0.5253201723098755,0.8014744520187378,-1.078803539276123,0.7526521682739258,0.8947911262512207,1.030880331993103,-0.11566359549760818,0.8868575096130371,0.7529403567314148,0.0815008357167244,-0.7764682173728943,0.7573199272155762,0.700654923915863,0.9816205501556396,-0.7538471221923828,-0.8123699426651001,1.0642855167388916,-0.7657874822616577,-1.0403845310211182,0.27166444063186646,-0.9976863861083984,-0.9416283965110779,-1.0264735221862793,0.5003169775009155,-1.057175874710083,0.8024879693984985,-0.06931311637163162,0.7876960635185242,1.0516828298568726,-1.1551307439804077,-0.9914983510971069,1.115867018699646,-0.8172269463539124,0.751054584980011,-0.5702265501022339,-0.8541625142097473,1.0552011728286743,0.5897875428199768,-0.9063143730163574,-0.0014912269543856382,-0.8715770840644836,-0.2481270581483841,-1.0776419639587402,0.8115789294242859,0.8825179934501648,-0.6865957379341125,0.8269904851913452,0.7347946763038635,0.12292467802762985,0.4563320279121399,0.8172180652618408,-0.058201681822538376,-0.00186146458145231,1.0419872999191284,0.944339394569397,-0.919138491153717,0.6711363196372986,0.930547833442688,0.8000667691230774,-0.5643067955970764,0.45937785506248474,-0.688703179359436,-1.0188298225402832};
 float bias2_list[L3]={0.46203604340553284,0.37419500946998596,0.3,0.1};	
-
-typedef struct {
-	float a[BSIZE];
-} blockvec;
-
-typedef struct {
-	int a[BSIZE];
-} actvec;
-
-typedef struct {
-	float a[L2];
-} w1blockvec; //also used for delta1 and a1
-typedef struct {
-	float a[L3];
-} w3blockvec; //also used for delta2
-
-typedef struct {
-	float a[L1];
-} a0blockvec;
-//typedef struct {
-//	float a[L4];
-//} w3blockvec;
-//typedef struct {
-//	float out[BLOCK_SIZE][BLOCK_SIZE];
-//} blockmat;
-
-// void loadIn(blockvec In[],  a0blockvec a0_buf[BSIZE],hls::stream<blockvec> &Inrows,const int LL,int ind);
-void loadIn(blockvec In[],  hls::stream<a0blockvec> a0_buf_fifo,hls::stream<blockvec> &Inrows,const int LL,int ind);
-void loadSn(blockvec In[], hls::stream<blockvec> &Inrows,const int LL,int ind);
-void fw_l1(hls::stream<blockvec> &Inrows, w1blockvec a1_buf[BSIZE],w1blockvec bias, w1blockvec Wcols[], hls::stream<blockvec> &Crows, bsbit actder[L2],const int LL,const int LN);
-void fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias,w3blockvec Wcols[], hls::stream<blockvec> &Crows,const int LL,const int LN);
-// void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,blockvec outs[],float delt2_buf[BSIZE][L3]);
-// void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
-void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
-// void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE][L2], const int LL,const int LN);
-void sub_backmm2(blockvec Inrows[], w1blockvec Wcols[], bsbit actder[L2],w1blockvec delt1_buf[BSIZE], const int LL,const int LN);
-void actderiv(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
-void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);
-// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float a0_buf[L1][BSIZE],float a1_buf[L2][BSIZE],float delt2_buf[BSIZE][L3],float delt1_buf[BSIZE][L2]);
-// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-// void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],w1blockvec bias1,w3blockvec bias2,float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
-	w1blockvec w1bram[],w3blockvec w2bram[], w1blockvec w1bram_t[],w3blockvec w2bram_t[], 
-	w1blockvec bias1,w3blockvec bias2,w1blockvec bias1_t,w3blockvec bias2_t,
-	float gamma, float alpha,
-	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
-
-
 // void learners_top(blockvec *S, blockvec *Snt, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
 }
 
