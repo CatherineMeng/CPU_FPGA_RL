@@ -127,7 +127,8 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
 void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
 
-void test_target(hls::stream<blockvec> &outpipe3);
+// void test_target(hls::stream<blockvec> &outpipe3);
+void test_target(hls::stream<blockvec> &outpipe1, hls::stream<blockvec> &outpipe3);
 
 // void test_fw_l2(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Crows);
 void test_fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias, w3blockvec Wcols[],  hls::stream<blockvec> &Crows);

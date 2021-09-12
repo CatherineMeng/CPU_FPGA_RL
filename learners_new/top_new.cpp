@@ -134,12 +134,10 @@ void fw_l1_targ(hls::stream<blockvec> &Inrows,  w1blockvec bias, w1blockvec Wcol
 	#pragma HLS aggregate variable=Inrows
 	#pragma HLS aggregate variable=Wcols
 	#pragma HLS aggregate variable=Crows
-	#pragma HLS aggregate variable=actder_fifo
 	#pragma HLS aggregate variable=bias
 	// #pragma HLS ARRAY_PARTITION variable=z1_buf dim=3 complete
 	// #pragma HLS ARRAY_PARTITION variable=z1_buf dim=4 complete
-    #pragma HLS dependence class=array variable=z1_buf_local type=inter dependent=false
-    #pragma HLS dependence class=array variable=z1_buf_local type=intra dependent=false
+
 	float z1_buf_local[BSIZE/P][L2/T][P][T];
 	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=3 complete
 	#pragma HLS ARRAY_PARTITION variable=z1_buf_local dim=4 complete
@@ -570,7 +568,11 @@ void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_bu
 }
 
 
-void test_target(hls::stream<blockvec> &outpipe3){
+void test_target(hls::stream<blockvec> &outpipe1, hls::stream<blockvec> &outpipe3){
+	for(int j = 0; j < L2; j++) { //this factor consistent with a1_buf_fifo partition
+		blockvec tempC=outpipe1.read();
+	}
+
 	for (int i = 0; i < L3; i++){
 		blockvec tmpt;
 		for (int j = 0; j < BSIZE; j++){
@@ -616,6 +618,10 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 	#pragma HLS aggregate variable=w2bram
 	#pragma HLS aggregate variable=bias1
 	#pragma HLS aggregate variable=bias2
+	#pragma HLS aggregate variable=w1bram_t
+	#pragma HLS aggregate variable=w2bram_t
+	#pragma HLS aggregate variable=bias1_t
+	#pragma HLS aggregate variable=bias2_t
 	// #pragma HLS array_partition variable=w2bram type=cyclic  factor=8
 
 	hls::stream<blockvec> inpipe;
@@ -744,7 +750,7 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 		// loadIn(A, inpipe, L1,ind);
 		loadIn(A, a0_buf_fifo, inpipe, L1, ind);
 		// test_loadIn(a0_buf_fifo, inpipe);
-		// loadSn(Atarg, inpipe0, L1, ind);
+		loadSn(Atarg, inpipe0, L1, ind);
 		// fw_l1(inpipe, z1_buf, bias1, w1bram, outpipe[0], actder,L1,L2);
 		// fw_l1(inpipe, z1_buf, a1_buf_fifo,bias1, w1bram, outpipe[0], actder,L1,L2);
 		fw_l1(inpipe,a1_buf_fifo,bias1, w1bram, outpipe0, actder_fifo,L1,L2);
@@ -753,8 +759,8 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 		// fw_l2(outpipe[0], z2_buf, bias2,w2bram, outpipe[1],L2,L3);
 		fw_l2(outpipe0, bias2,w2bram, outpipe1,L2,L3);
 		// test_fw_l2(outpipe0,bias2,w2bram,outpipe1);
-		// fw_l1_targ(inpipe0,bias1_t, w1bram_t, outpipe2,L1,L2);
-		// fw_l2(outpipe2, bias2_t,w2bram_t, outpipe3,L2,L3);
+		fw_l1_targ(inpipe0,bias1_t, w1bram_t, outpipe2,L1,L2);
+		fw_l2(outpipe2, bias2_t,w2bram_t, outpipe3,L2,L3);
 
 		// consistent with python golden tb
 		// for (int i = 0; i < L3; i++){
@@ -765,7 +771,7 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 		// 	}
 		// 	outpipe3.write(tmpt);
 		// }
-		test_target(outpipe3);
+		// test_target(outpipe2,outpipe3);
 		// objctv(r, acts, gamma, done,outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
 		objctv(r, acts, gamma, done,outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
 		// test_objctv(outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
@@ -904,27 +910,30 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 	#pragma HLS aggregate variable=bias2
 	#pragma HLS aggregate variable=bias1_t
 	#pragma HLS aggregate variable=bias2_t
-	if (wsync==0){
+	if (wsync==0){ //Init. Q network & target network (only executed exactly once in all iterations!)
 		for (int i=0; i<L1;i++){
 			#pragma HLS PIPELINE
 			for  (int j=0; j<L2;j++){
 				#pragma HLS UNROLL
 				w1bram[i].a[j]=w1list[i][j];
+				w1bram_t[i].a[j]=w1list[i][j];
 			}
 		}
 
 		for (int i=0; i<L2;i++){
 		#pragma HLS PIPELINE
 			for  (int j=0; j<L3;j++){
-				if (j<2) w2bram[i].a[j]=w2list_or[i][j];
-				else w2bram[i].a[j]=w2list_or[i][j-2];
+				if (j<2) {w2bram[i].a[j]=w2list_or[i][j];w2bram_t[i].a[j]=w2list_or[i][j];}
+				else {w2bram[i].a[j]=w2list_or[i][j-2];w2bram_t[i].a[j]=w2list_or[i][j-2];}
 			}
 		}
 		for (int i=0; i<L2;i++){
 			bias1.a[i]=bias1_list[i];
+			bias1_t.a[i]=bias1_list[i];
 		}
 		for (int i=0; i<L3;i++){
 			bias2.a[i]=bias2_list[i];
+			bias2_t.a[i]=bias2_list[i];
 		}
 
 	}
