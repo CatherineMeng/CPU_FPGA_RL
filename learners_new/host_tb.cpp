@@ -4,10 +4,10 @@
 #define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
 #define CL_USE_DEPRECATED_OPENCL_1_2_APIS
 
-#define In_dim 8
-#define W1_out_dim 8
-#define W2_out_dim 64
-#define action_space_dim 4
+#define In_dim 8 //L1
+#define W1_out_dim 8 //L1
+#define W2_out_dim 64 //L2
+#define action_space_dim 4 //L3
 
 #include <vector>
 #include <unistd.h>
@@ -31,6 +31,7 @@ const int pc[MAX_HBM_PC_COUNT] = {
 template <typename T1>
 struct aligned_allocator
 {
+
   using value_type = T1;
   T1* allocate(std::size_t num)
   {
@@ -71,10 +72,10 @@ int main(int argc, char **argv)
     //In_dim=BATCH SIZE
     // learners_top(blockvec *S, blockvec *Snt, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync)
     std::vector<blockvec, aligned_allocator<blockvec>> In_rows;
-    In_rows.resize(In_dim);
+    In_rows.resize(In_dim*BATCHS);
     // std::vector<blockvec> In_rows_snt(In_dim);
     std::vector<blockvec, aligned_allocator<blockvec>> In_rows_snt;
-    In_rows_snt.resize(In_dim);
+    In_rows_snt.resize(In_dim*BATCHS);
     // std::vector<w1blockvec> Out_w1bram(W1_out_dim);
     std::vector<w1blockvec, aligned_allocator<w1blockvec>> Out_w1bram;
     Out_w1bram.resize(W1_out_dim);
@@ -83,26 +84,53 @@ int main(int argc, char **argv)
     Out_w2bram.resize(W2_out_dim);
     // std::vector<blockvec> C_rows(In_dim);
 
+    std::vector<actvec, aligned_allocator<actvec>> In_actions;
+    In_actions.resize(BATCHS);
+
+    std::vector<blockvec, aligned_allocator<blockvec>> In_rewards;
+    In_rewards.resize(BATCHS);
+
+    std::vector<bsbit, aligned_allocator<bsbit>> In_dones;
+    In_dones.resize(BATCHS);
     printf("here 1\n");
     
 
     
-    int i, j, k;
+    int i, j, jj;
     std::cout << "init input states." << std::endl;
     printf("\ninput s content:\n");
-    for (i = 0; i < BSIZE; i++) {
+    
+    for (jj = 0; jj < BATCHS; jj++) {   
         for (j = 0; j < L1; j++) {
-            In_rows[j].a[i] = float(-j)/float(4.0);
-            In_rows_snt[j].a[i] = float(j)/float(4.0);
+            for (i = 0; i < BSIZE; i++) {
+            In_rows[L1*jj+j].a[i] = float(-j)/float(4.0);
+            In_rows_snt[L1*jj+j].a[i] = float(j)/float(4.0);
             printf("%f ",In_rows[j].a[i]);
-
+            printf("%f ",In_rows_snt[j].a[i]);
+            }
         }
     }
 
+    printf("\ninput reward/action/done content:\n");
+
+    for (jj = 0; jj < BATCHS; jj++) {   
+        for (i = 0; i < BSIZE; i++) {
+        // printf("\njj,i:%d,%d\n",jj,i);
+        In_actions[jj].a[i] = int(2);
+        In_rewards[jj].a[i] = float(1);
+        In_dones[jj].a[i] = int(0);
+        std::cout << sizeof(int) * BSIZE * BATCHS << std::endl;
+        std::cout << sizeof(float) * BSIZE * BATCHS << std::endl;
+        // printf("%f ",In_actions[jj].a[i]);
+        }
+    }
   printf("inied\n");
     
     cl_mem_ext_ptr_t InrExt;
     cl_mem_ext_ptr_t InrExt2;
+    cl_mem_ext_ptr_t InrExt3;
+    cl_mem_ext_ptr_t InrExt4;
+    cl_mem_ext_ptr_t InrExt5;
     cl_mem_ext_ptr_t OutExt;
     cl_mem_ext_ptr_t OutExt2;
     
@@ -115,6 +143,18 @@ int main(int argc, char **argv)
     InrExt2.param = 0;
     InrExt2.flags = 0|XCL_MEM_TOPOLOGY;
 
+    InrExt3.obj = In_actions.data();
+    InrExt3.param = 0;
+    InrExt3.flags = 0|XCL_MEM_TOPOLOGY;
+
+    InrExt4.obj = In_rewards.data();
+    InrExt4.param = 0;
+    InrExt4.flags = 0|XCL_MEM_TOPOLOGY;
+
+    InrExt5.obj = In_dones.data();
+    InrExt5.param = 0;
+    InrExt5.flags = 0|XCL_MEM_TOPOLOGY;
+
     OutExt.obj = Out_w1bram.data();
     OutExt.param = 0;
     OutExt.flags = 0|XCL_MEM_TOPOLOGY;
@@ -126,20 +166,47 @@ int main(int argc, char **argv)
     // CrExt.obj = C_rows.data();
     // CrExt.param = 0;
     // CrExt.flags = 1|XCL_MEM_TOPOLOGY;
+    
+
+    // actvec acts={2}; //consistent with tb. Moved to Aligned allocator
+    // blockvec r={1}; //consistent with tb. Moved to Aligned allocator
+    float gamma=0.5;
+    float alpha=0.1;
+
+    // sglbit done_tmp=0;
+    // sglbit done_tmp=0;
+    // bsbit done={0}; //consistent with tb. Moved to Aligned allocator
+    // for(int i = 0; i < BSIZE; i++) {
+    //     done.a[i]=0;  //BS cols
+
+    // }
+    
     int wsync = 0;
+
   printf("flags set\n");
     // Create the buffers and allocate memory
-    cl::Buffer in1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim, &InrExt, &err);
-    cl::Buffer in2_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim, &InrExt2, &err);
+    cl::Buffer in1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim * BATCHS, &InrExt, &err);
+    cl::Buffer in2_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * In_dim * BATCHS, &InrExt2, &err);
+    cl::Buffer in3_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(actvec) * BATCHS, &InrExt3, &err);
+    std::cout << sizeof(actvec) * BATCHS << std::endl;
+    cl::Buffer in4_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(blockvec) * BATCHS, &InrExt4, &err);
+    cl::Buffer in5_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_READ_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(bsbit) * BATCHS, &InrExt5, &err);
     cl::Buffer out1_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_WRITE_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(w1blockvec) * W1_out_dim, &OutExt, &err);
     cl::Buffer out2_buf(context, CL_MEM_USE_HOST_PTR|CL_MEM_WRITE_ONLY|CL_MEM_EXT_PTR_XILINX, sizeof(w3blockvec) * W2_out_dim, &OutExt2, &err);
       printf("hi\n");
+
+      // void learners_top(blockvec *S, blockvec *Snt, actvec *acts,blockvec *r,float gamma, float alpha, bsbit *done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync)
     // Set kernel arguments
     krnl_top.setArg(0, in1_buf);
     krnl_top.setArg(1, in2_buf);
-    krnl_top.setArg(2, out1_buf);
-    krnl_top.setArg(3, out2_buf);
-    krnl_top.setArg(4, wsync);
+    krnl_top.setArg(2, in3_buf);
+    krnl_top.setArg(3, in4_buf);
+    krnl_top.setArg(4, gamma);
+    krnl_top.setArg(5, alpha);
+    krnl_top.setArg(6, in5_buf);
+    krnl_top.setArg(7, out1_buf);
+    krnl_top.setArg(8, out2_buf);
+    krnl_top.setArg(9, wsync);
 
     // Map host-side buffer memory to user-space pointers [replaced, used equeueMapBuffer]
     //blockvec *A = (blockvec *)q.enqueueMapBuffer(in1_buf, CL_TRUE, CL_MAP_WRITE, 0, sizeof(blockvec) * In_dim);
@@ -149,38 +216,25 @@ int main(int argc, char **argv)
     //std::vector<blockvec> B(In_dim);
     //std::vector<blockmat> C(W1_out_dim);
     
-      printf("setArg finished\n");
+    printf("setArg finished\n");
 
-    // FILE *fp3;
-    // fp3=fopen("./IOnkernel.dat","w");
 
-    // for (j = 0; j < L1; j++) {
-    //     for (i = 0; i < BSIZE; i++) {
-    //         fprintf(fp3,"%f ",In_rows[j].a[i]);
-    //     }
-    //     fprintf(fp3,"\n");
-    // }
-
-    // fclose(fp3);
-    printf("starting kernel\n");
     // ------------------------------------------------------------------------------------
     // Step 3: Run the kernel
     // ------------------------------------------------------------------------------------
 
-    krnl_top.setArg(0, in1_buf);
-    krnl_top.setArg(1, in2_buf);
-    krnl_top.setArg(2, out1_buf);
-    krnl_top.setArg(3, out2_buf);
-    krnl_top.setArg(4, wsync);
-    // krnl_top.setArg(1, out_buf);
     printf("setArg\n");
     // Schedule transfer of inputs to device memory, execution of kernel, and transfer of outputs back to host memory
     q.enqueueMigrateMemObjects({in1_buf}, 0 /* 0 means from host*/);
     q.enqueueMigrateMemObjects({in2_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in3_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in4_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in5_buf}, 0 /* 0 means from host*/);
+    q.finish();
     printf("sent data\n");
     q.enqueueTask(krnl_top);
-    // q.finish();
-    
+    q.finish();
+    printf("enqueue\n");
     q.enqueueMigrateMemObjects({out1_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
     q.enqueueMigrateMemObjects({out2_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
     printf("executed kernel\n");

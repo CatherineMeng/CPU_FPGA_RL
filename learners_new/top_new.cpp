@@ -328,10 +328,13 @@ void test_fw_l2(hls::stream<blockvec> &Inrows,  w3blockvec bias,w3blockvec Wcols
 //delt2_buf_fifo:L3*BSIZE, same content as outs, aggreegate L3 to be used in wu-gradient_compute
 // void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,
 // 	blockvec outs[],float delt2_buf_fifo[BSIZE][L3]){
-void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo){
+void objctv(blockvec *r, actvec *action, float gamma, bsbit *done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo, int ind){
 	#pragma HLS aggregate variable=Qrows
 	#pragma HLS aggregate variable=Qtrows
 
+	blockvec r_local=r[ind];
+	actvec action_local=action[ind];
+	bsbit done_local=done[ind];
 	// Get argmax target Q vals of size BSIZE
 	blockvec argmax_tq={0};
 	for (int i=0;i<L3;i++){
@@ -361,15 +364,15 @@ void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<bloc
 		for (int j=0;j<BSIZE;j++){
 			
 			#pragma HLS PIPELINE
-			if (i==action.a[j])
+			if (i==action_local.a[j])
 			{
 				float actdertmp=(tmpq.a[j]>0)? 1:0; //relu derivative
 				#ifndef __SYNTHESIS__
 				printf("\ntmpq.a[%d]:%f",j,tmpq.a[j]);
 				#endif
 				// tmpobj.a[j]=2*(tmpq.a[j]-r.a[j]*argmax_tq.a[j])*actdertmp; 
-				float oneb=1-done.a[j]; //cast fixed point to float
-				tmpobj.a[j]=2*(r.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j])*actdertmp; 
+				float oneb=1-done_local.a[j]; //cast fixed point to float
+				tmpobj.a[j]=2*(r_local.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j])*actdertmp; 
 				#ifndef __SYNTHESIS__
 				printf("\nnode %d, sample in batch-tmpobj.a[%d]:%f",i,j,tmpobj.a[j]);
 				#endif
@@ -599,7 +602,7 @@ void test_target(hls::stream<blockvec> &outpipe1, hls::stream<blockvec> &outpipe
 
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],a0blockvec a0_buf_fifo[BSIZE],float a1_buf_fifo[L2][BSIZE],float delt2_buf_fifo[BSIZE][L3],float delt1_buf[BSIZE][L2]){
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]){
-void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
+void fw_bw(blockvec *A,blockvec *Atarg,actvec *acts,blockvec *r,bsbit *done,
 	w1blockvec w1bram[],w3blockvec w2bram[], w1blockvec w1bram_t[],w3blockvec w2bram_t[], 
 	w1blockvec bias1,w3blockvec bias2,w1blockvec bias1_t,w3blockvec bias2_t,
 	float gamma,
@@ -725,13 +728,13 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 	// actvec acts={2}; //just init
 	// Update host tb========================================
 
-	#ifndef __SYNTHESIS__
-	for (int j = 0; j < BSIZE; j++){
-	#pragma HLS PIPELINE
-		acts.a[j]=j+2;
-		r.a[j]=1;
-	}
-	#endif
+	// #ifndef __SYNTHESIS__
+	// for (int j = 0; j < BSIZE; j++){
+	// #pragma HLS PIPELINE
+	// 	acts.a[j]=j+2;
+	// 	r.a[j]=1;
+	// }
+	// #endif
 	// blockvec outpipe6[L3];
 	// blockvec outpipe6;
 	hls::stream<blockvec> outpipe6;
@@ -774,7 +777,7 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 		// }
 		// test_target(outpipe2,outpipe3);
 		// objctv(r, acts, gamma, done,outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
-		objctv(r, acts, gamma, done,outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
+		objctv(r, acts, gamma, done,outpipe1,outpipe3,outpipe6, delt2_buf_fifo,ind);
 		// test_objctv(outpipe1,outpipe3,outpipe6, delt2_buf_fifo);
 		// sub_backmm2(hls::stream<blockvec> &Inrows, w3blockvec Wcols[], float z1_buf[BSIZE/P][64/T][P][T],float delt1_buf[BSIZE/P][64/T][P][T], const int LL,const int LN) {
 		sub_backmm2(outpipe6, w2bram_copy, actder_fifo, delt1_buf_fifo, L3,L2);
@@ -868,14 +871,21 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 //add replay inputs: int insert_signal,int insert_ind,
 //add replay outputs: int ind_o[]
 //add qt weight sync signal: if wsync==0: init q & qt params; if wsync==1: let qt params=q params; else: keep updating q param
-void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync){
+void learners_top(blockvec *S, blockvec *Snt, actvec *acts,blockvec *r,float gamma, float alpha, bsbit *done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync){
 	#pragma HLS INTERFACE m_axi port=S bundle=gmem1 offset=slave
 	#pragma HLS INTERFACE m_axi port=Snt bundle=gmem2 offset=slave
+	#pragma HLS INTERFACE m_axi port=acts bundle=gmem5 offset=slave
+	#pragma HLS INTERFACE m_axi port=r bundle=gmem6 offset=slave
+	#pragma HLS INTERFACE m_axi port=done bundle=gmem7 offset=slave
 	#pragma HLS INTERFACE m_axi port=w1bram_out bundle=gmem3 offset=slave
 	#pragma HLS INTERFACE m_axi port=w2bram_out bundle=gmem4 offset=slave
 
+
 	#pragma HLS INTERFACE s_axilite port=S bundle=control
 	#pragma HLS INTERFACE s_axilite port=Snt bundle=control
+	#pragma HLS INTERFACE s_axilite port=acts bundle=control
+	#pragma HLS INTERFACE s_axilite port=r bundle=control
+	#pragma HLS INTERFACE s_axilite port=done bundle=control
 	#pragma HLS INTERFACE s_axilite port=w1bram_out bundle=control
 	#pragma HLS INTERFACE s_axilite port=w2bram_out bundle=control
 
@@ -900,20 +910,23 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 
 	#ifndef __SYNTHESIS__
 	printf("\nacts:\n");
-	for(int i = 0; i < BSIZE; i++) {
-		printf("%d ",acts.a[i]);  //BS cols
-
+	for(int j = 0; j < BATCHS; j++) {
+		for(int i = 0; i < BSIZE; i++) {
+			printf("%d ",acts[j].a[i]);  //BS cols
+		}
 	}
 	printf("\nr:\n");
-	for(int i = 0; i < BSIZE; i++) {
-		printf("%f ",r.a[i]);  //BS cols
-
+	for(int j = 0; j < BATCHS; j++) {
+		for(int i = 0; i < BSIZE; i++) {
+			printf("%f ",r[j].a[i]);  //BS cols
+		}
 	}
 	printf("\ndone:\n");
-	for(int i = 0; i < BSIZE; i++) {
+	for(int j = 0; j < BATCHS; j++) {
+		for(int i = 0; i < BSIZE; i++) 	{
 		// printf("%s ",done.a[i].to_string(10).c_str());  //BS cols
-		printf("%d ",done.a[i]);  //BS cols
-
+			printf("%d ",done[j].a[i]);  //BS cols
+		}
 	}
 	#endif
 

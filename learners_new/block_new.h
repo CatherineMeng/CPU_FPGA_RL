@@ -19,6 +19,7 @@ using namespace std;
 // const int L2 = 64;
 // const int L3 = 4;
 
+// total batch size = BATCHS*BSIZE
 #define BATCHS 1
 #define BSIZE 1
 #define L1 8
@@ -108,7 +109,8 @@ void fw_l2(hls::stream<blockvec> &Inrows, w3blockvec bias,w3blockvec Wcols[], hl
 // void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows,blockvec outs[],float delt2_buf[BSIZE][L3]);
 // void objctv(blockvec r, actvec action, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
 // void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, blockvec outs[],w3blockvec delt2_buf[BSIZE]);
-void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo);
+// void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo);
+void objctv(blockvec *r, actvec *action, float gamma, bsbit *done, hls::stream<blockvec> &Qrows,hls::stream<blockvec> &Qtrows, hls::stream<blockvec> &outs,hls::stream<w3blockvec> &delt2_buf_fifo, int ind);
 // void sub_backmm2(blockvec Inrows[], w3blockvec Wcols[], bsbit actder[L2],float delt1_buf[BSIZE][L2], const int LL,const int LN);
 // void sub_backmm2(blockvec Inrows[], w1blockvec Wcols[], bsbit actder[L2],w1blockvec delt1_buf[BSIZE], const int LL,const int LN);
 void sub_backmm2(hls::stream<blockvec> &Inrows, w1blockvec Wcols[], hls::stream<bsbit> &actder_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, const int LL,const int LN);
@@ -121,12 +123,13 @@ void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float a0_buf[L1][BSIZE],float a1_buf[L2][BSIZE],float delt2_buf[BSIZE][L3],float delt1_buf[BSIZE][L2]);
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],w1blockvec bias1,w3blockvec bias2,float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
+void fw_bw(blockvec *A,blockvec *Atarg,actvec *acts,blockvec *r,bsbit *done,
 	w1blockvec w1bram[],w3blockvec w2bram[], w1blockvec w1bram_t[],w3blockvec w2bram_t[], 
 	w1blockvec bias1,w3blockvec bias2,w1blockvec bias1_t,w3blockvec bias2_t,
-	float gamma, 
+	float gamma,
 	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]);
-void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
+// void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma, float alpha, bsbit done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
+void learners_top(blockvec *S, blockvec *Snt, actvec *acts,blockvec *r,float gamma, float alpha, bsbit *done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],int wsync);
 
 // void test_target(hls::stream<blockvec> &outpipe3);
 void test_target(hls::stream<blockvec> &outpipe1, hls::stream<blockvec> &outpipe3);
