@@ -19,7 +19,7 @@ using namespace std;
 // const int L2 = 64;
 // const int L3 = 4;
 
-#define BATCHS 16
+#define BATCHS 1
 #define BSIZE 1
 #define L1 8
 #define L2 64
@@ -30,11 +30,12 @@ using namespace std;
 #define actderdepth (L2 * 3)
 // #define delt2depth (BSIZE)
 
-typedef ap_fixed<1,1> sglbit;
+typedef ap_fixed<2,1> sglbit;
 
 
 typedef struct {
-	sglbit a[BSIZE];
+	// sglbit a[BSIZE];
+	int a[BSIZE];
 } bsbit;
 
 //hardware parameters

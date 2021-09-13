@@ -371,7 +371,7 @@ void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<bloc
 				float oneb=1-done.a[j]; //cast fixed point to float
 				tmpobj.a[j]=2*(r.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j])*actdertmp; 
 				#ifndef __SYNTHESIS__
-				printf("\nnode %d, tmpobj.a[%d]:%f",i,j,tmpobj.a[j]);
+				printf("\nnode %d, sample in batch-tmpobj.a[%d]:%f",i,j,tmpobj.a[j]);
 				#endif
 			}
 			else
@@ -379,9 +379,9 @@ void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<bloc
 			//write to delt2_buf_fifo
 			// delt2_buf_fifo[j].a[i]=tmpobj.a[j];
 			d2tmp[j].a[i]=tmpobj.a[j];
-			#ifndef __SYNTHESIS__
-			if(d2tmp[j].a[i]!=0)printf("\ndelt2_buf_fifo[%d][%d]:%f",j,i,delt2_buf_fifo[j].a[i]);
-			#endif
+			// #ifndef __SYNTHESIS__
+			// if(d2tmp[j].a[i]!=0)printf("\ndelt2_buf_fifo[%d][%d]:%f",j,i,delt2_buf_fifo[j].a[i]);
+			// #endif
 		}
 		// outs[i]=(tmpobj);
 		outs.write(tmpobj);
@@ -394,7 +394,8 @@ void objctv(blockvec r, actvec action, float gamma, bsbit done, hls::stream<bloc
 	printf("\ndelt2_buf_fifo content:\n");//should be L3 rows, BSIZE columns
 	for (int i=0;i<L3;i++){
 		for (int j=0;j<BSIZE;j++){
-			printf("%f ",delt2_buf_fifo[j].a[i]);
+			// printf("%f ",delt2_buf_fifo[j].a[i]);
+			printf("%f ",d2tmp[j].a[i]);
 		}
 	}
 
@@ -524,8 +525,8 @@ void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_bu
 	#pragma HLS array_partition variable=wa1_buf complete  dim=3
 	#pragma HLS array_partition variable=wa1_buf complete  dim=4
 	WA1partialsum: for(int k=0; k < BSIZE; k++) {
-		a0blockvec a0tmp = a0_buf_fifo.read()
-		w1blockvec d1tmp = delt1_buf_fifo.read()
+		a0blockvec a0tmp = a0_buf_fifo.read();
+		w1blockvec d1tmp = delt1_buf_fifo.read();
 		// #pragma HLS DATAFLOW
 		for(int i = 0; i < L1/P3; i++) {
 			for(int j = 0; j < L2/T3; j++) {
@@ -547,8 +548,8 @@ void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_bu
 	#pragma HLS array_partition variable=wa2_buf complete  dim=3
 	#pragma HLS array_partition variable=wa2_buf complete  dim=4
 	WA2partialsum: for(int k=0; k < BSIZE; k++) {
-		w1blockvec a1tmp = a1_buf_fifo.read()
-		w3blockvec d2tmp = delt2_buf_fifo.read()
+		w1blockvec a1tmp = a1_buf_fifo.read();
+		w3blockvec d2tmp = delt2_buf_fifo.read();
 		for(int i = 0; i < L2/P4; i++) {
 			for(int j = 0; j < L3/T4; j++) {
 			#pragma HLS PIPELINE
@@ -741,7 +742,7 @@ void fw_bw(blockvec *A,blockvec *Atarg,actvec acts,blockvec r,bsbit done,
 	// w1blockvec a1_buf_fifo[BSIZE];
 	// float z2_buf[BSIZE/P2][L3/T2][P2][T2]={0};
 	// bsbit actder[L2]={0};
-	for(int ind=0; ind<16; ind++){
+	for(int ind=0; ind<BATCHS; ind++){
 		#pragma HLS DATAFLOW
 		// bsbit actder[L2];
 		// #pragma HLS aggregate variable=actder
@@ -896,6 +897,26 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 	#pragma HLS aggregate variable=w2bram_t
 	#pragma HLS bind_storage variable=w2bram_t type=RAM_2P impl=bram 
 
+
+	#ifndef __SYNTHESIS__
+	printf("\nacts:\n");
+	for(int i = 0; i < BSIZE; i++) {
+		printf("%d ",acts.a[i]);  //BS cols
+
+	}
+	printf("\nr:\n");
+	for(int i = 0; i < BSIZE; i++) {
+		printf("%f ",r.a[i]);  //BS cols
+
+	}
+	printf("\ndone:\n");
+	for(int i = 0; i < BSIZE; i++) {
+		// printf("%s ",done.a[i].to_string(10).c_str());  //BS cols
+		printf("%d ",done.a[i]);  //BS cols
+
+	}
+	#endif
+
 	// #pragma HLS array_partition variable=w1bram type=block  factor=2
 	// #pragma HLS array_partition variable=w2bram type=block  factor=8
 
@@ -911,6 +932,10 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 	#pragma HLS aggregate variable=bias1_t
 	#pragma HLS aggregate variable=bias2_t
 	if (wsync==0){ //Init. Q network & target network (only executed exactly once in all iterations!)
+
+	#ifndef __SYNTHESIS__
+	printf("\nWeight init.\n");
+	#endif
 		for (int i=0; i<L1;i++){
 			#pragma HLS PIPELINE
 			for  (int j=0; j<L2;j++){
@@ -939,6 +964,9 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 	}
 
 	else if (wsync==1){ //sync target network with Q network
+	#ifndef __SYNTHESIS__
+	printf("\nTarget Weight sync.\n");
+	#endif
 		for (int i=0; i<L1;i++){
 			#pragma HLS PIPELINE
 			for  (int j=0; j<L2;j++){
@@ -996,6 +1024,11 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 			}
 		}
 	}
+
+	#ifndef __SYNTHESIS__
+	printf("\nw1bram updated.\n");
+	#endif
+
 	for(int i = 0; i < L2/P4; i++) {
 		for(int j = 0; j < L3/T4; j++) {
 		// #pragma HLS PIPELINE
@@ -1010,6 +1043,10 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 			}
 		}
 	}
+
+	#ifndef __SYNTHESIS__
+	printf("\nw2bram updated.\n");
+	#endif
 
 	//sync weights to cpu
 	// {
@@ -1030,7 +1067,9 @@ void learners_top(blockvec *S, blockvec *Snt, actvec acts,blockvec r,float gamma
 
 	}
 	// }	
-
+	#ifndef __SYNTHESIS__
+	printf("\nTransfer.\n");
+	#endif
 
 }
 
