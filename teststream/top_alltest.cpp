@@ -183,90 +183,19 @@ void wa2(hls::stream<w3blockvec> &delt2_buf_fifo,float wa2_buf[L2/P4][L3/T4][P4]
 
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],a0blockvec a0_buf_fifo[BSIZE],float a1_buf_fifo[L2][BSIZE],float delt2_buf_fifo[BSIZE][L3],float delt1_buf[BSIZE][L2]){
 // void fw_bw(blockvec *A,w1blockvec w1bram[],w3blockvec w2bram[],float bias1[],float bias2[],float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4]){
-void fw_bw(blockvec *A,blockvec *Atarg,actvec *acts,blockvec *r,bsbit *done,
-	float gamma, hls::stream<ap_axiu<32,0,0,0>> &pn_out,
-	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4],
-	float *Qs,float *Loss_sqrt){
+// void fw_bw(blockvec *A,blockvec *Atarg,actvec *acts,blockvec *r,bsbit *done,
+// 	float gamma, hls::stream<ap_axiu<32,0,0,0>> &pn_out,
+// 	float wa1_global[L1/P3][L2/T3][P3][T3],float wa2_global[L2/P4][L3/T4][P4][T4],
+// 	float *Qs,float *Loss_sqrt){
 
-	#pragma HLS INTERFACE m_axi port=A bundle=gmem0 offset=slave
-	#pragma HLS INTERFACE s_axilite port=A bundle=control
-	#pragma HLS INTERFACE s_axilite port=return bundle=control
-
-	// #pragma HLS array_partition variable=a0_buf_fifo type=block  factor=8  dim=1
-	#pragma HLS array_partition variable=wa1_global complete  dim=3
-	#pragma HLS array_partition variable=wa1_global complete  dim=4
-	#pragma HLS array_partition variable=wa2_global complete  dim=3
-	#pragma HLS array_partition variable=wa2_global complete  dim=4
 
 
 	// #pragma HLS array_partition variable=w2bram type=cyclic  factor=8
 
-	hls::stream<blockvec> inpipe;
-	hls::stream<blockvec> inpipe0;
 
-	// #pragma HLS array_partition variable=outpipe complete
-	#pragma HLS STREAM variable=inpipe depth=8 //L1
-	#pragma HLS STREAM variable=inpipe0 depth=8 //L1
-
- 
-	hls::stream<w3blockvec> delt2_buf_fifo; //delta2 for wu, produced by obj, parallel access on L3 dimension
-	// #pragma HLS aggregate variable=delt2_buf_fifo
-	#pragma HLS STREAM variable=delt2_buf_fifo depth=1 //BSIZE
-	#pragma HLS bind_storage variable=delt2_buf_fifo type=fifo impl=BRAM
-
-
-	float wa1_buf[L1/P3][L2/T3][P3][T3]={0};
-	float wa2_buf[L2/P4][L3/T4][P4][T4]={0};
-
-
-	#pragma HLS array_partition variable=wa1_buf complete  dim=3
-	#pragma HLS array_partition variable=wa1_buf complete  dim=4
-	#pragma HLS array_partition variable=wa2_buf complete  dim=3
-	#pragma HLS array_partition variable=wa2_buf complete  dim=4
-
-
-
-	for(int ind=0; ind<BATCHS; ind++){
-		// #pragma HLS DATAFLOW
-
-		loadIn(A, inpipe, L1, ind);
-		// test_loadIn(a0_buf_fifo, inpipe);
-		loadSn(Atarg, inpipe0, L1, ind);
-
-		objctv(r, acts, gamma, done, inpipe,inpipe0,delt2_buf_fifo, ind,pn_out, Qs,Loss_sqrt);
-
-		wa1(wa1_buf);
-		wa2(delt2_buf_fifo,wa2_buf);
-
-
-	}
-
-// write to global WA
-	for(int i = 0; i < L1/P3; i++) {
-		for(int j = 0; j < L2/T3; j++) {
-		#pragma HLS PIPELINE
-		// #pragma HLS dependence variable=wa1_buf inter false
-			for(int ii = 0; ii < P3; ii++) {
-				for(int jj = 0; jj < T3; jj++) { 
-					wa1_global[i][j][ii][jj] = wa1_buf[i][j][ii][jj];
-				}
-			}
-		}
-	}
-	for(int i = 0; i < L2/P4; i++) {
-		for(int j = 0; j < L3/T4; j++) {
-		#pragma HLS PIPELINE
-		// #pragma HLS dependence variable=wa2_buf inter false
-			for(int ii = 0; ii < P4; ii++) {
-				for(int jj = 0; jj < T4; jj++) { 
-					wa2_global[i][j][ii][jj] = wa2_buf[i][j][ii][jj];
-				}
-			}
-		}
-	}
 	// WA2partialsum: for(int k=0; k < BSIZE; k++) {}
 
-}
+// }
 
 void learners_top(blockvec *S, blockvec *Snt, actvec *acts, blockvec *r, float gamma, float alpha, bsbit *done, w1blockvec w1bram_out[L1],w3blockvec w2bram_out[L2],float *bias1_out,float *bias2_out,int wsync, /*Learners args*/
 	float *Qs,float *Loss_sqrt,/*Logging args*/
@@ -303,6 +232,14 @@ void learners_top(blockvec *S, blockvec *Snt, actvec *acts, blockvec *r, float g
 
 
 	#pragma HLS INTERFACE axis port=pn_out 
+
+	#pragma HLS aggregate variable=S
+	#pragma HLS aggregate variable=Snt
+	#pragma HLS aggregate variable=acts
+	#pragma HLS aggregate variable=r
+	#pragma HLS aggregate variable=done
+	#pragma HLS aggregate variable=w1bram_out
+	#pragma HLS aggregate variable=w2bram_out
 
 	static w1blockvec w1bram[L1]; //w1
 	#pragma HLS aggregate variable=w1bram
@@ -380,17 +317,77 @@ void learners_top(blockvec *S, blockvec *Snt, actvec *acts, blockvec *r, float g
 	}
 
 
-	float wa1_global[L1/P3][L2/T3][P3][T3]={0};
-	float wa2_global[L2/P4][L3/T4][P4][T4]={0}; 
-
-	#pragma HLS array_partition variable=wa1_global complete  dim=3
-	#pragma HLS array_partition variable=wa1_global complete  dim=4
-	#pragma HLS array_partition variable=wa2_global complete  dim=3
-	#pragma HLS array_partition variable=wa2_global complete  dim=4
-
 	float Qs_local[BATCHS*BSIZE];
 	float Loss_sqrt_local[BATCHS*BSIZE];
-	fw_bw(S,Snt,acts,r,done, gamma, pn_out, wa1_global,wa2_global,Qs_local,Loss_sqrt_local);
+	// fw_bw(S,Snt,acts,r,done, gamma, pn_out, wa1_global,wa2_global,Qs_local,Loss_sqrt_local);
+
+// ========================================================================
+
+
+	hls::stream<blockvec> inpipe;
+	hls::stream<blockvec> inpipe0;
+
+	// #pragma HLS array_partition variable=outpipe complete
+	#pragma HLS STREAM variable=inpipe depth=8 //L1
+	#pragma HLS STREAM variable=inpipe0 depth=8 //L1
+
+ 
+	hls::stream<w3blockvec> delt2_buf_fifo; //delta2 for wu, produced by obj, parallel access on L3 dimension
+	// #pragma HLS aggregate variable=delt2_buf_fifo
+	#pragma HLS STREAM variable=delt2_buf_fifo depth=1 //BSIZE
+	#pragma HLS bind_storage variable=delt2_buf_fifo type=fifo impl=BRAM
+
+
+	float wa1_buf[L1/P3][L2/T3][P3][T3]={0};
+	float wa2_buf[L2/P4][L3/T4][P4][T4]={0};
+
+
+	#pragma HLS array_partition variable=wa1_buf complete  dim=3
+	#pragma HLS array_partition variable=wa1_buf complete  dim=4
+	#pragma HLS array_partition variable=wa2_buf complete  dim=3
+	#pragma HLS array_partition variable=wa2_buf complete  dim=4
+
+
+
+	for(int ind=0; ind<BATCHS; ind++){
+		// #pragma HLS DATAFLOW
+
+		loadIn(S, inpipe, L1, ind);
+		// test_loadIn(a0_buf_fifo, inpipe);
+		loadSn(Snt, inpipe0, L1, ind);
+
+		objctv(r, acts, gamma, done, inpipe,inpipe0,delt2_buf_fifo, ind,pn_out, Qs_local, Loss_sqrt_local);
+
+		wa1(wa1_buf);
+		wa2(delt2_buf_fifo,wa2_buf);
+
+
+	}
+
+// write to global WA
+	for(int i = 0; i < L1/P3; i++) {
+		for(int j = 0; j < L2/T3; j++) {
+		#pragma HLS PIPELINE
+		// #pragma HLS dependence variable=wa1_buf inter false
+			for(int ii = 0; ii < P3; ii++) {
+				for(int jj = 0; jj < T3; jj++) { 
+					wa1_buf[i][j][ii][jj] = wa1_buf[i][j][ii][jj];
+				}
+			}
+		}
+	}
+	for(int i = 0; i < L2/P4; i++) {
+		for(int j = 0; j < L3/T4; j++) {
+		#pragma HLS PIPELINE
+		// #pragma HLS dependence variable=wa2_buf inter false
+			for(int ii = 0; ii < P4; ii++) {
+				for(int jj = 0; jj < T4; jj++) { 
+					wa2_buf[i][j][ii][jj] = wa2_buf[i][j][ii][jj];
+				}
+			}
+		}
+	}
+	// =========================================================================
 
 
 	#pragma HLS array_partition variable=w1bram type=cyclic  factor=2
@@ -402,7 +399,7 @@ void learners_top(blockvec *S, blockvec *Snt, actvec *acts, blockvec *r, float g
 				#pragma HLS PIPELINE
 				#pragma HLS dependence variable=w1bram inter false
 				for(int jj = 0; jj < T3; jj++) { 
-					w1bram[i*P3+ii].a[j*T3+jj] -=wa1_global[i][j][ii][jj];
+					w1bram[i*P3+ii].a[j*T3+jj] -=wa1_buf[i][j][ii][jj];
 					// w1bram_out[i*P3+ii].a[j*T3+jj]=w1bram[i*P3+ii].a[j*T3+jj];
 				}
 			}
@@ -421,7 +418,7 @@ void learners_top(blockvec *S, blockvec *Snt, actvec *acts, blockvec *r, float g
 				#pragma HLS PIPELINE
 				#pragma HLS dependence variable=w2bram inter false
 				for(int jj = 0; jj < T4; jj++) { 
-					w2bram[i*P4+ii].a[j*T4+jj] -=wa2_global[i][j][ii][jj];
+					w2bram[i*P4+ii].a[j*T4+jj] -=wa2_buf[i][j][ii][jj];
 					// w2bram_out[i*P4+ii].a[j*T4+jj]=w2bram[i*P4+ii].a[j*T4+jj];
 				}
 			}
