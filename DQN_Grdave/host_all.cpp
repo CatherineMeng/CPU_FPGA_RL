@@ -196,32 +196,7 @@ int main(int argc, char ** argv){
     Out_Loss.resize(BATCHS*BSIZE);
 
     int i, j, jj;
-    std::cout << "init input states..." << std::endl;
-    printf("\ninput s content:\n");
-    
-    for (jj = 0; jj < BATCHS; jj++) {   
-        for (j = 0; j < L1; j++) {
-            for (i = 0; i < BSIZE; i++) {
-            In_rows[L1*jj+j].a[i] = float(-j)/float(4.0)+jj;
-            In_rows_snt[L1*jj+j].a[i] = float(jj)/float(4.0);
-            printf("%f ",In_rows[j].a[i]);
-            printf("%f ",In_rows_snt[j].a[i]);
-            }
-        }
-    }
 
-    printf("\nInit input reward/action/done content...\n");
-
-    for (jj = 0; jj < BATCHS; jj++) {   
-        for (i = 0; i < BSIZE; i++) {
-        // printf("\njj,i:%d,%d\n",jj,i);
-            if(jj%2==0)In_actions[jj].a[i] = int(2);
-            else In_actions[jj].a[i] = int(1);
-            In_rewards[jj].a[i] = float(1);
-            In_dones[jj].a[i] = int(0);
-        // printf("%f ",In_actions[jj].a[i]);
-        }
-    }
     
     std::vector<int, aligned_allocator<int>> insert_ind;
     insert_ind.resize(insert_batch);
@@ -230,7 +205,7 @@ int main(int argc, char ** argv){
     std::vector<int, aligned_allocator<int>> ind_o_out;
     ind_o_out.resize(N_learner);
 
-    printf("\nInit replay insert inputs...\n");
+    printf("\nHost: Init replay insert inputs...\n");
     for (i = 0; i < insert_batch; i++) {
         // printf("\njj,i:%d,%d\n",jj,i);
         insert_ind[i] = i;
@@ -360,7 +335,7 @@ int main(int argc, char ** argv){
 
 
 
-
+/*
     
     OCL_CHECK(err,cl::Kernel krnl_tree(program, "Top_tree:{Top_tree_1}", &err));
 
@@ -375,8 +350,8 @@ int main(int argc, char ** argv){
     krnl_tree.setArg(3, update_signal);
     krnl_tree.setArg(5, sample_signal);
     krnl_tree.setArg(6, out_buf);
-    // q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
+    // q.enqueueMigrateMemObjects({insind_buf}, 0);
+    // q.enqueueMigrateMemObjects({inpn_buf}, 0);
     q.enqueueTask(krnl_tree);
     // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
     q.finish();
@@ -405,7 +380,7 @@ int main(int argc, char ** argv){
     krnl_tree2.setArg(3, update_signal);
     krnl_tree2.setArg(5, sample_signal);
     krnl_tree2.setArg(6, out_buf);
-    q.enqueueMigrateMemObjects({insind_buf,inpn_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({insind_buf,inpn_buf}, 0);
     q.finish();
     q.enqueueTask(krnl_tree2);
     q.finish();
@@ -422,8 +397,34 @@ int main(int argc, char ** argv){
     q.finish(); //(??? Sequential after Insert or need barrier ???):
     printf("q.finish\n");
     //
+    */
 
+    std::cout << "Host: init input states..." << std::endl;
+    printf("\nHost: input s content:\n");
+    
+    for (jj = 0; jj < BATCHS; jj++) {   
+        for (j = 0; j < L1; j++) {
+            for (i = 0; i < BSIZE; i++) {
+            In_rows[L1*jj+j].a[i] = float(-j)/float(4.0)+jj;
+            In_rows_snt[L1*jj+j].a[i] = float(jj)/float(4.0);
+            printf("%f ",In_rows[j].a[i]);
+            // printf("%f ",In_rows_snt[j].a[i]);
+            }
+        }
+    }
 
+    printf("\nHost: Init input reward/action/done content...\n");
+
+    for (jj = 0; jj < BATCHS; jj++) {   
+        for (i = 0; i < BSIZE; i++) {
+        // printf("\njj,i:%d,%d\n",jj,i);
+            if(jj%2==0)In_actions[jj].a[i] = int(2);
+            else In_actions[jj].a[i] = int(1);
+            In_rewards[jj].a[i] = float(1);
+            In_dones[jj].a[i] = int(0);
+            printf("%d ",In_actions[jj].a[i]);
+        }
+    }
 
     OCL_CHECK(err,cl::Kernel krnl_top(program, "learners_top:{top_1}", &err));
     cl::Kernel krnl_tree3(program, "Top_tree", &err); // ===================Replay Update (Parallel with train):
@@ -455,7 +456,7 @@ int main(int argc, char ** argv){
     krnl_tree3.setArg(5, sample_signal);
     krnl_tree3.setArg(6, out_buf);
     
-    q.enqueueMigrateMemObjects({in1_buf,in2_buf,in3_buf,in4_buf,in5_buf}, CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in1_buf,in2_buf,in3_buf,in4_buf,in5_buf}, 0 /* 0 means from host*/);
     // q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
     // q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
     q.finish();

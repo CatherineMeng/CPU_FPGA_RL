@@ -192,9 +192,13 @@ void Top_tree(int insert_signal,int *insert_ind,float *init_priority, int update
 		}
 
 		#ifndef __SYNTHESIS__
-		printf("\n priorities to insert:\n");
+		// printf("\n priorities to insert - port:\n");
+		// for (int i=0;i<insert_batch;i++){
+		// 	printf("%f ",init_priority[i]);
+		// }
+		printf("\n priorities to insert - fixed pt local buffer:\n");
 		for (int i=0;i<insert_batch;i++){
-			printf("%f ",init_priority[i]);
+			printf("%s ",p_ini[i].to_string().c_str());
 		}
 		printf("\n");
 		printf("\n indices to insert:\n");
