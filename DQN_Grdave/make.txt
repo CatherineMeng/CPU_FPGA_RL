@@ -1,0 +1,61 @@
+=======================
+  U200 software sim:
+=======================
+cd test_kn2row_vitis/sw_emu/
+
+g++ -Wall -g -std=c++11 ../host_all.cpp -o app.exe -I${XILINX_XRT}/include/ -I/tools/Xilinx/Vivado/2020.2/include/ -L/tools/Xilinx/Vivado/2020.2/lib/ -L${XILINX_VIVADO}/lib/ -lOpenCL -lpthread -lrt -lstdc++
+
+emconfigutil --platform xilinx_u200_xdma_201830_2 --nd 1
+
+
+v++ -c -t sw_emu --config ../u200r.cfg -k Top_tree -I../ ../top_rmm.cpp -o topr.xo
+v++ -c -t sw_emu --config ../u200l.cfg -k learners_top -I../ ../topl_new.cpp -o topl.xo
+
+v++ -l -t sw_emu --config ../u200.cfg ./topr.xo ./topl.xo -o top.xclbin
+
+export XCL_EMULATION_MODE=sw_emu
+
+./app.exe
+
+
+=======================
+  U200 hardware emu:
+=======================
+
+cd ../hw_emu/
+
+g++ -Wall -g -std=c++11 ../host_all.cpp -o app.exe -I${XILINX_XRT}/include/ -I/tools/Xilinx/Vivado/2020.2/include/ -L/tools/Xilinx/Vivado/2020.2/lib/ -L${XILINX_VIVADO}/lib/ -lOpenCL -lpthread -lrt -lstdc++
+
+
+emconfigutil --platform xilinx_u200_xdma_201830_2 --nd 1
+
+
+v++ -c -t hw_emu --config --kernel_frequency 200 ../u200r.cfg -k Top_tree -I../ ../top_rmm.cpp -o topr.xo
+
+v++ -c -t hw_emu --config ../u200r.cfg -k Top_tree -I../ ../top_rmm.cpp -o topr.xo
+v++ -c -t hw_emu --config ../u200l.cfg -k learners_top -I../ ../topl_new.cpp -o topl.xo
+
+v++ -l -t hw_emu --config ../u200.cfg ./topr.xo ./topl.xo -o top.xclbin
+
+export XCL_EMULATION_MODE=hw_emu
+
+./app.exe
+
+
+=======================
+	U200 hardware:
+=======================
+
+cd ../hw
+
+g++ -Wall -g -std=c++11 ../host_all.cpp -o app.exe -I${XILINX_XRT}/include/ -I/tools/Xilinx/Vivado/2020.2/include/ -L/tools/Xilinx/Vivado/2020.2/lib/ -L${XILINX_VIVADO}/lib/ -lOpenCL -lpthread -lrt -lstdc++
+
+v++ -c -t hw --kernel_frequency 200 --config ../u200r.cfg -k Top_tree -I../ ../top_rmm.cpp -o topr.xo
+v++ -c -t hw --kernel_frequency 200 --config ../u200l.cfg -k learners_top -I../ ../topl_new.cpp -o topl.xo
+
+v++ -l -t hw --kernel_frequency 200 --config ../u200.cfg ./topr.xo ./topl.xo -o top.xclbin
+
+./app.exe
+
+
+
