@@ -306,6 +306,11 @@ void Top_tree(int insert_signal,int *insert_ind,float *init_priority, int update
 
 	if (update_signal==1){ //Uncomment later as needed
 	#ifndef __SYNTHESIS__
+
+		printf("Entered update: parent memoinization array:\n\n");
+		for (int i=0;i<N_learner;i++){
+			printf("%d %d\n",par_m[i][0],par_m[i][1]); //TLev1,TLev2
+		}
 	printf("Tree content before update\n");
 	for (int i=0;i<N_learner;i++){
 		printf("Learner at index %d: \n",i);

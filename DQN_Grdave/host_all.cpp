@@ -334,9 +334,6 @@ int main(int argc, char ** argv){
 
 
 
-
-/*
-    
     OCL_CHECK(err,cl::Kernel krnl_tree(program, "Top_tree:{Top_tree_1}", &err));
 
     // ===================Replay Insert Initialze:
@@ -397,7 +394,7 @@ int main(int argc, char ** argv){
     q.finish(); //(??? Sequential after Insert or need barrier ???):
     printf("q.finish\n");
     //
-    */
+    
 
     std::cout << "Host: init input states..." << std::endl;
     printf("\nHost: input s content:\n");
@@ -457,12 +454,12 @@ int main(int argc, char ** argv){
     krnl_tree3.setArg(6, out_buf);
     
     q.enqueueMigrateMemObjects({in1_buf,in2_buf,in3_buf,in4_buf,in5_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
     q.finish();
     // printf("sent data\n");
     q.enqueueTask(krnl_top);
-    // q.enqueueTask(krnl_tree3);
+    q.enqueueTask(krnl_tree3);
     q.finish();
     // printf("enqueue\n");
     q.enqueueMigrateMemObjects({out1_buf,out2_buf,out3_buf,out4_buf,out5_buf,out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
