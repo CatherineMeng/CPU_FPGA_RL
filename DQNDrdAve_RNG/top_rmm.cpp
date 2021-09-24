@@ -191,6 +191,16 @@ void Top_tree(int insert_signal,int *insert_ind,float *init_priority, int update
 		#ifndef __SYNTHESIS__
 		printf("\nTree init done.\n");
 		#endif
+		// for (int i=0;i<Lev2_Width;i++){ //16
+		// 	init_fan4.TLev2[i]=0;
+		// 	for (int j=0;j<K;j++){ //0*4 ~16*4-1 (0123, 0123....64 times)
+		// 		init_fan4.TLev3[i*K+j]=0;
+		// 	}
+		// }
+		// for (int i=0;i<K;i++){ //4
+		// 	init_fan4.TLev1[i]=0; //24
+		// }
+		// init_fan4.TLev0=0; //root
 		for (int j=0;j<Lev3_Width;j++){ //0*4 ~16*4-1 (0123, 0123....64 times)
 			init_fan4.TLev3[j]=0;
 		}
@@ -201,7 +211,6 @@ void Top_tree(int insert_signal,int *insert_ind,float *init_priority, int update
 			init_fan4.TLev1[i]=0; //24
 		}
 		init_fan4.TLev0=0; //root
-
 	}
 
 

@@ -424,13 +424,15 @@ void objctv(blockvec *r, actvec *action, float gamma, bsbit *done, hls::stream<b
 			#pragma HLS PIPELINE
 			if (i==action_local.a[j]) //only happens BSIZE times
 			{
-				float actdertmp=(tmpq.a[j]>0)? 1:0; //relu derivative
+				// float actdertmp=(tmpq.a[j]>0)? 1:0; //relu derivative
 				#ifndef __SYNTHESIS__
 				printf("\ntmpq.a[%d]:%f",j,tmpq.a[j]);
 				#endif
 				// tmpobj.a[j]=2*(tmpq.a[j]-r.a[j]*argmax_tq.a[j])*actdertmp; 
 				float oneb=1-done_local.a[j]; //cast fixed point to float
-				tmpobj.a[j]=2*(r_local.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j])*actdertmp; 
+				// tmpobj.a[j]=2*(r_local.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j])*actdertmp; 
+				// tmpobj.a[j]=2*(r_local.a[j]+oneb*gamma*argmax_tq.a[j]-tmpq.a[j]); 
+				tmpobj.a[j]=2*(tmpq.a[j] - r_local.a[j] - oneb*gamma*argmax_tq.a[j]);
 				Qtransfer[j]=tmpq.a[j];
 				TDtransfer[j]=tmpobj.a[j]/2;
 				#ifndef __SYNTHESIS__
@@ -604,7 +606,7 @@ void sub_backmm2(hls::stream<blockvec> &Inrows, w1blockvec Wcols[], hls::stream<
 
 
 
-void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3], w1blockvec gr_bias1){
+void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3], float gr_bias1[L3]){
 	#pragma HLS array_partition variable=wa1_buf complete  dim=3
 	#pragma HLS array_partition variable=wa1_buf complete  dim=4
 
@@ -632,12 +634,12 @@ void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_bu
 		for (int i=0; i<L2;i++){
 			#pragma HLS PIPELINE
 			#pragma HLS dependence variable=gr_bias1 inter false
-			gr_bias1.a[i] += d1tmp.a[i];
+			gr_bias1[i] += d1tmp.a[i];
 		}		
 	}
 }
 
-void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4], w3blockvec gr_bias2){
+void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4], float gr_bias2[L3]){
 	#pragma HLS array_partition variable=wa2_buf complete  dim=3
 	#pragma HLS array_partition variable=wa2_buf complete  dim=4
 
@@ -667,7 +669,7 @@ void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_bu
 		for (int i=0; i<L3;i++){
 			#pragma HLS PIPELINE
 			#pragma HLS dependence variable=gr_bias2 inter false
-			gr_bias2.a[i] += d2tmp.a[i];
+			gr_bias2[i] += d2tmp.a[i];
 		}
 	}
 }
@@ -919,8 +921,8 @@ hls::stream<ap_axiu<32,0,0,0>> &pn_out/*Replay args*/){
 	float wa2_buf[L2/P4][L3/T4][P4][T4]={0};
 	#pragma HLS bind_storage variable=wa1_buf type=RAM_2P impl=bram
 	#pragma HLS bind_storage variable=wa2_buf type=RAM_2P impl=bram
-	w1blockvec gr_bias1={0};
-	w3blockvec gr_bias2={0};
+	float gr_bias1[L2]={0};
+	float gr_bias2[L3]={0};
 
 	// #pragma HLS array_partition variable=w2bram type=cyclic  factor=8 
 
@@ -973,7 +975,40 @@ hls::stream<ap_axiu<32,0,0,0>> &pn_out/*Replay args*/){
 		wa2(a1_buf_fifo, delt2_buf_fifo, wa2_buf, gr_bias2);
 	}
 	//================================================================================================
-
+	#ifndef __SYNTHESIS__
+	printf("\nwa1_buf:FPGA\n");
+	for(int i = 0; i < L1/P3; i++) {
+		for(int ii = 0; ii < P3; ii++) {
+			for(int j = 0; j < L2/T3; j++) {
+				for(int jj = 0; jj < T3; jj++) { 
+					printf("%f  ",wa1_buf[i][j][ii][jj]);
+					// w1bram_out[i*P3+ii].a[j*T3+jj]=w1bram[i*P3+ii].a[j*T3+jj];
+				}
+			}
+			printf("\n");
+		}
+	}
+	printf("\ngr_bias1\n");
+	for(int j = 0; j < L2; j++) {
+		printf("%f ",gr_bias1[j]);
+	}
+	printf("\nwa2_buf:FPGA\n");
+	for(int i = 0; i < L2/P4; i++) {
+		for(int ii = 0; ii < P4; ii++) {
+			for(int j = 0; j < L3/T4; j++) {
+				for(int jj = 0; jj < T4; jj++) { 
+					printf("%f  ",wa2_buf[i][j][ii][jj]);
+					// w1bram_out[i*P3+ii].a[j*T3+jj]=w1bram[i*P3+ii].a[j*T3+jj];
+				}
+			}
+			printf("\n");
+		}
+	}
+	printf("\ngr_bias2\n");
+	for(int j = 0; j < L3; j++) {
+		printf("%f ",gr_bias2[j]);
+	}
+	#endif
 	float alpha_local=alpha;
 	// #pragma HLS array_partition variable=w1bram type=cyclic  factor=2
 	// #pragma HLS array_partition variable=w2bram type=cyclic  factor=8
@@ -1014,11 +1049,11 @@ hls::stream<ap_axiu<32,0,0,0>> &pn_out/*Replay args*/){
 	#endif
 
 	for (int i=0; i<L2;i++){
-		bias1.a[i] -= alpha_local * gr_bias1.a[i];
+		bias1.a[i] -= alpha_local * gr_bias1[i];
 		// bias1_out[i]=bias1.a[i];
 	}
 	for (int i=0; i<L3;i++){
-		bias2.a[i] -= alpha_local * gr_bias2.a[i];
+		bias2.a[i] -= alpha_local * gr_bias2[i];
 		// bias2_out[i]=bias2.a[i];
 	}
 

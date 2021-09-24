@@ -123,8 +123,8 @@ void sub_backmm2(hls::stream<blockvec> &Inrows, w1blockvec Wcols[], hls::stream<
 
 // void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3]);
 // void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4]);
-void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3], w1blockvec gr_bias1);
-void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4], w3blockvec gr_bias2);
+void wa1(hls::stream<a0blockvec> &a0_buf_fifo, hls::stream<w1blockvec> &delt1_buf_fifo, float wa1_buf[L1/P3][L2/T3][P3][T3], float gr_bias1[L2]);
+void wa2(hls::stream<w1blockvec> &a1_buf_fifo, hls::stream<w3blockvec> &delt2_buf_fifo, float wa2_buf[L2/P4][L3/T4][P4][T4], float gr_bias2[L3]);
 
 void actderiv(hls::stream<blockvec> &Inrows, hls::stream<blockvec> &Outrows,const int L);
 void storeDDR(blockvec C[],  hls::stream<blockvec> &Crows,  const int LN);

@@ -523,7 +523,7 @@ int main(int argc, char ** argv){
     printf("\nW1 content:\n");
     for(int i = 0; i < L1; i++) {
         for(int j = 0; j < L2; j++) {
-                printf("%.8f ",Out_w1bram[j].a[i]);  //L1 rows, L2 cols                
+                printf("%.8f ",Out_w1bram[i].a[j]);  //L1 rows, L2 cols                
         }
         printf("\n");        
     }
@@ -536,7 +536,7 @@ int main(int argc, char ** argv){
     printf("\nW2 content:\n");
     for(int i = 0; i < L2; i++) {
         for(int j = 0; j < L3; j++) {
-                printf("%.8f ",Out_w2bram[j].a[i]);  //L2 rows, L3 cols
+                printf("%.8f ",Out_w2bram[i].a[j]);  //L2 rows, L3 cols
         }
         printf("\n");
     }
