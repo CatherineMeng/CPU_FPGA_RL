@@ -227,60 +227,60 @@ int main(int argc, char ** argv){
 
     InrExt.obj = In_rows.data();
     InrExt.param = 0;
-    InrExt.banks = XCL_MEM_DDR_BANK1;
-    InrExt.flags = XCL_MEM_DDR_BANK1;
+    InrExt.banks = XCL_MEM_DDR_BANK0;
+    InrExt.flags = XCL_MEM_DDR_BANK0;
 
     InrExt2.obj = In_rows_snt.data();
     InrExt2.param = 0;
-    InrExt2.banks = XCL_MEM_DDR_BANK1;
-    InrExt2.flags = XCL_MEM_DDR_BANK1;
+    InrExt2.banks = XCL_MEM_DDR_BANK0;
+    InrExt2.flags = XCL_MEM_DDR_BANK0;
 
     InrExt3.obj = In_actions.data();
     InrExt3.param = 0;
-    InrExt3.banks = XCL_MEM_DDR_BANK1;
-    InrExt3.flags = XCL_MEM_DDR_BANK1;
+    InrExt3.banks = XCL_MEM_DDR_BANK0;
+    InrExt3.flags = XCL_MEM_DDR_BANK0;
 
     InrExt4.obj = In_rewards.data();
     InrExt4.param = 0;
-    InrExt4.banks = XCL_MEM_DDR_BANK1;
-    InrExt4.flags = XCL_MEM_DDR_BANK1;
+    InrExt4.banks = XCL_MEM_DDR_BANK0;
+    InrExt4.flags = XCL_MEM_DDR_BANK0;
 
     InrExt5.obj = In_dones.data();
     InrExt5.param = 0;
-    InrExt5.banks = XCL_MEM_DDR_BANK1;
-    InrExt5.flags = XCL_MEM_DDR_BANK1;
+    InrExt5.banks = XCL_MEM_DDR_BANK0;
+    InrExt5.flags = XCL_MEM_DDR_BANK0;
 
     OutExt.obj = Out_w1bram.data();
     OutExt.param = 0;
-    OutExt.banks = XCL_MEM_DDR_BANK1;
-    OutExt.flags = XCL_MEM_DDR_BANK1;
+    OutExt.banks = XCL_MEM_DDR_BANK0;
+    OutExt.flags = XCL_MEM_DDR_BANK0;
 
     OutExt2.obj = Out_w2bram.data();
     OutExt2.param = 0;
-    OutExt2.banks = XCL_MEM_DDR_BANK1;
-    OutExt2.flags = XCL_MEM_DDR_BANK1;
+    OutExt2.banks = XCL_MEM_DDR_BANK0;
+    OutExt2.flags = XCL_MEM_DDR_BANK0;
 
 
     OutExt3.obj = Out_bias1.data();
     OutExt3.param = 0;
-    OutExt3.banks = XCL_MEM_DDR_BANK1;
-    OutExt3.flags = XCL_MEM_DDR_BANK1;
+    OutExt3.banks = XCL_MEM_DDR_BANK0;
+    OutExt3.flags = XCL_MEM_DDR_BANK0;
 
     OutExt4.obj = Out_bias2.data();
     OutExt4.param = 0;
-    OutExt4.banks = XCL_MEM_DDR_BANK1;
-    OutExt4.flags = XCL_MEM_DDR_BANK1;
+    OutExt4.banks = XCL_MEM_DDR_BANK0;
+    OutExt4.flags = XCL_MEM_DDR_BANK0;
 
 
     OutExt5.obj = Out_Q.data();
     OutExt5.param = 0;
-    OutExt5.banks = XCL_MEM_DDR_BANK1;
-    OutExt5.flags = XCL_MEM_DDR_BANK1;
+    OutExt5.banks = XCL_MEM_DDR_BANK0;
+    OutExt5.flags = XCL_MEM_DDR_BANK0;
 
     OutExt6.obj = Out_Loss.data();
     OutExt6.param = 0;
-    OutExt6.banks = XCL_MEM_DDR_BANK1;
-    OutExt6.flags = XCL_MEM_DDR_BANK1;
+    OutExt6.banks = XCL_MEM_DDR_BANK0;
+    OutExt6.flags = XCL_MEM_DDR_BANK0;
 
     // ========================replay=====================
     
@@ -564,108 +564,108 @@ int main(int argc, char ** argv){
     // // ===================Learner train with static weight:
 
 
-    // cl::Kernel krnl_top1(program, "learners_top", &err);
-    // gamma=0.5;
-    // alpha=0.1;
-    // wsync = 1;
-    // krnl_top1.setArg(0, in1_buf);
-    // krnl_top1.setArg(1, in2_buf);
-    // krnl_top1.setArg(2, in3_buf);
-    // krnl_top1.setArg(3, in4_buf);
-    // krnl_top1.setArg(4, gamma);
-    // krnl_top1.setArg(5, alpha);
-    // krnl_top1.setArg(6, in5_buf);
-    // krnl_top1.setArg(7, out1_buf);
-    // krnl_top1.setArg(8, out2_buf);
-    // krnl_top1.setArg(9, out3_buf);
-    // krnl_top1.setArg(10, out4_buf); //bias2, float*L3
-    // krnl_top1.setArg(11, wsync);
-    // krnl_top1.setArg(12, out5_buf); //Logging Qs  float*BATCHS*BSIZE
-    // krnl_top1.setArg(13, out6_buf); //Logging Loss  float*BATCHS*BSIZE
-    // // Schedule transfer of inputs to device memory, execution of kernel, and transfer of outputs back to host memory
-    // q.enqueueMigrateMemObjects({in1_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({in2_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({in3_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({in4_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({in5_buf}, 0 /* 0 means from host*/);
-    // // q.finish();
-    // // printf("sent data\n");
-    // q.enqueueTask(krnl_top1);
-    // // q.finish();
-    // // printf("enqueue\n");
+    cl::Kernel krnl_top1(program, "learners_top", &err);
+    cl::Kernel krnl_tree4(program, "Top_tree", &err);
+    gamma=0.5;
+    alpha=0.1;
+    wsync = 1;
+    krnl_top1.setArg(0, in1_buf);
+    krnl_top1.setArg(1, in2_buf);
+    krnl_top1.setArg(2, in3_buf);
+    krnl_top1.setArg(3, in4_buf);
+    krnl_top1.setArg(4, gamma);
+    krnl_top1.setArg(5, alpha);
+    krnl_top1.setArg(6, in5_buf);
+    krnl_top1.setArg(7, out1_buf);
+    krnl_top1.setArg(8, out2_buf);
+    krnl_top1.setArg(9, out3_buf);
+    krnl_top1.setArg(10, out4_buf); //bias2, float*L3
+    krnl_top1.setArg(11, wsync);
+    krnl_top1.setArg(12, out5_buf); //Logging Qs  float*BATCHS*BSIZE
+    krnl_top1.setArg(13, out6_buf); //Logging Loss  float*BATCHS*BSIZE
+
+    insert_signal_in = 0;
+    update_signal=1;
+    sample_signal = 0;
+    krnl_tree4.setArg(0, insert_signal_in);
+    krnl_tree4.setArg(1, insind_buf);
+    krnl_tree4.setArg(2, inpn_buf);
+    krnl_tree4.setArg(3, update_signal);
+    krnl_tree4.setArg(5, sample_signal);
+    krnl_tree4.setArg(6, load_seed);
+    krnl_tree4.setArg(7, out_buf);
+
+    // Schedule transfer of inputs to device memory, execution of kernel, and transfer of outputs back to host memory
+    q.enqueueMigrateMemObjects({in1_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in2_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in3_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in4_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({in5_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
+    q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
+    q.finish();
+    // printf("sent data\n");
+    q.enqueueTask(krnl_top1);
+    q.enqueueTask(krnl_tree4);
+    q.finish();
+    // printf("enqueue\n");
 
 
-    // q.enqueueMigrateMemObjects({out1_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // q.enqueueMigrateMemObjects({out2_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // q.enqueueMigrateMemObjects({out3_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // q.enqueueMigrateMemObjects({out4_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // q.enqueueMigrateMemObjects({out5_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // q.enqueueMigrateMemObjects({out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // printf("executed learner kernel with weight static\n");
-    // // ===================Replay Update (??? Parallel with train ???):
-
-
-    // cl::Kernel krnl_tree4(program, "Top_tree", &err);
-    // krnl_tree4.setArg(0, insert_signal_in);
-    // krnl_tree4.setArg(1, insind_buf);
-    // krnl_tree4.setArg(2, inpn_buf);
-    // krnl_tree4.setArg(3, update_signal);
-    // krnl_tree4.setArg(5, sample_signal);
-    // krnl_tree4.setArg(6, out_buf);
-    // insert_signal_in = 0;
-    // update_signal=1;
-    // sample_signal = 0;
-    // q.enqueueMigrateMemObjects({insind_buf}, 0 /* 0 means from host*/);
-    // q.enqueueMigrateMemObjects({inpn_buf}, 0 /* 0 means from host*/);
-    // q.enqueueTask(krnl_tree4);
+    q.enqueueMigrateMemObjects({out1_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out2_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out3_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out4_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out5_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.enqueueMigrateMemObjects({out6_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.finish();
     // q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
-    // // ------------------------------------------------------------------------------------
-    // // Step 4: Check Results and Release Allocated Resources
-    // // ------------------------------------------------------------------------------------
-    // // bool match = true;
-    // printf("======================================================================================================\n");
-    // printf("================================== DATA BACK TO HOST: Train round 2 ==================================\n");
-    // printf("======================================================================================================\n");
-    // // Print weights, bias
+    // ------------------------------------------------------------------------------------
+    // Step 4: Check Results and Release Allocated Resources
+    // ------------------------------------------------------------------------------------
+    // bool match = true;
+    printf("======================================================================================================\n");
+    printf("================================== DATA BACK TO HOST: Train round 2 ==================================\n");
+    printf("======================================================================================================\n");
+    // Print weights, bias
 
-    // printf("\nW1 content:\n");
-    // for(int i = 0; i < L1; i++) {
-    //     for(int j = 0; j < L2; j++) {
-    //             printf("%.8f ",Out_w1bram[j].a[i]);  //L1 rows, L2 cols                
-    //     }
-    //     printf("\n");        
-    // }
-    // printf("\nBias1 content:\n");
-    // for(int i = 0; i < L2; i++) {
-    //     printf("%.8f ",Out_bias1[i]);                 
-    // }
-    // printf("\n"); 
+    printf("\nW1 content:\n");
+    for(int i = 0; i < L1; i++) {
+        for(int j = 0; j < L2; j++) {
+                printf("%.8f ",Out_w1bram[i].a[j]);  //L1 rows, L2 cols                
+        }
+        printf("\n");        
+    }
+    printf("\nBias1 content:\n");
+    for(int i = 0; i < L2; i++) {
+        printf("%.8f ",Out_bias1[i]);                 
+    }
+    printf("\n"); 
 
-    // printf("\nW2 content:\n");
-    // for(int i = 0; i < L2; i++) {
-    //     for(int j = 0; j < L3; j++) {
-    //             printf("%.8f ",Out_w2bram[j].a[i]);  //L2 rows, L3 cols
-    //     }
-    //     printf("\n");
-    // }
-    // printf("\nBias2 content:\n");
-    // for(int i = 0; i < L3; i++) {
-    //     printf("%.8f ",Out_bias2[i]);           
-    // }
-    // printf("\n");  
+    printf("\nW2 content:\n");
+    for(int i = 0; i < L2; i++) {
+        for(int j = 0; j < L3; j++) {
+                printf("%.8f ",Out_w2bram[i].a[j]);  //L2 rows, L3 cols
+        }
+        printf("\n");
+    }
+    printf("\nBias2 content:\n");
+    for(int i = 0; i < L3; i++) {
+        printf("%.8f ",Out_bias2[i]);           
+    }
+    printf("\n");  
 
-    // //Print Qs, Loss
+    //Print Qs, Loss
 
-    // printf("\nQs content:\n");
-    // for(int i = 0; i < BATCHS*BSIZE; i++) {
-    //     printf("%.8f ",Out_Q[i]);
-    // }
-    // printf("\n"); 
-    // printf("\nLoss content:\n");
-    // for(int i = 0; i < BATCHS*BSIZE; i++) {
-    //     printf("%.8f ",Out_Loss[i]);
-    // }
-    // printf("\n"); 
+    printf("\nQs content:\n");
+    for(int i = 0; i < BATCHS*BSIZE; i++) {
+        printf("%.8f ",Out_Q[i]);
+    }
+    printf("\n"); 
+    printf("\nLoss content:\n");
+    for(int i = 0; i < BATCHS*BSIZE; i++) {
+        printf("%.8f ",Out_Loss[i]);
+    }
+    printf("\n"); 
 
 
   return 0;
