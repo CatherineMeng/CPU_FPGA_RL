@@ -131,14 +131,14 @@ void Sib_Iterator_l3(fixed_l3 TLev3[Lev3_Width],hls::stream<sibit_io> &ind_newxi
 // 3. sampling queue sent to data storage (output, write)
 void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::stream<ap_axiu<32, 0, 0, 0> >& q_insert, hls::stream<ap_axiu<32, 0, 0, 0> >& q_samp_out){
 // void Top_tree(int insert_signal,int insert_ind,int upd, float pn[],int ind_o[]){
-	#pragma HLS INTERFACE s_axilite port=insert_signal bundle=control
+	// #pragma HLS INTERFACE s_axilite port=insert_signal bundle=control
 	#pragma HLS interface ap_ctrl_none port = return
 
 	static Tree init_fan4;
 	#pragma HLS bind_storage variable=init_fan4 type=RAM_2P impl=uram
 
 	// static int par_m[N_learner][D-1]; //memoinization array for parent nodes, useful in later update process
-	int ind_o_local[128]={0};
+	int ind_o_local[128];
 	//local counter for insertion index
 	int insert_ind;
 	static int par_m[128][D-1]; //memoinization array for parent nodes, useful in later update process
@@ -161,6 +161,13 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 		#endif
 		insert_ind=0;
 		init_signal.read();
+
+		for (int j=0;j<128;j++){
+			ind_o_local[j]=0;
+			for (int k=0;k<D-1;k++){
+				par_m[j][k]=0;
+			}
+		}
 	}
 	
 
@@ -179,12 +186,12 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 			}
 			upd_main_loop:for (int i=0;i<BS;i++){
 				#pragma pipeline
-				fixed_l3 diff=init_fan4.TLev3[ind_o[i]]-pnint[i];
+				fixed_l3 diff=init_fan4.TLev3[ind_o_local[i]]-pnint[i];
 
 				init_fan4.TLev0-=diff;
 				init_fan4.TLev1[par_m[i][0]]-=diff;
 				init_fan4.TLev2[par_m[i][1]]-=diff;
-				init_fan4.TLev3[ind_o[i]]-=diff;
+				init_fan4.TLev3[ind_o_local[i]]-=diff;
 			}
 
 			//==========================Sampling=============================
@@ -204,7 +211,7 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 				// rng_type retz[N_learner]; //betwen 0 and 1
 				fixed_root rngs [BS];
 				rng_type retz[BS]; //betwen 0 and 1
-				if (load_seed==1) pseudo_random(67,1,retz,0); //seed is 67
+				pseudo_random(67,1,retz,0); //seed is 67
 				  
 				for (int i=0; i<N_learner; i++){
 				    // pseudo_random(seed, load, ret[i], lfsr);
@@ -234,9 +241,9 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 					Sib_Iterator_l3(init_fan4.TLev3,l2_out_pipe,ind_o_local,i);
 
 				}
-				for (int i=0;i<N_learner;i++){
-					ind_o[i]=ind_o_local[i];
-				}
+				// for (int i=0;i<N_learner;i++){
+				// 	ind_o[i]=ind_o_local[i];
+				// }
 				#ifndef __SYNTHESIS__
 				printf("Sampling: parent memoinization array:\n\n");
 				for (int i=0;i<N_learner;i++){
@@ -244,7 +251,7 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 				}
 				printf("Sampling: output indices array:\n\n");
 				for (int i=0;i<N_learner;i++){
-					printf("%d ",ind_o[i]); //TLev3
+					printf("%d ",ind_o_local[i]); //TLev3
 				}
 				#endif
 			}
@@ -257,7 +264,9 @@ void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axi
 			// fixed_insrt p_ini
 			for (int i=0;i<N_actor;i++){
 				fixed_insrt p1;
-				p1=fixed_insrt(init_priority[i]);
+				ap_axiu<32,0,0,0> pntmp =q_insert.read();
+				fixed_insrt init_priority = pntmp.data;
+				p1=(init_priority);
 				p_ini[i]=p1;
 				insert_ind_local[i]=insert_ind; 
 				insert_ind++;

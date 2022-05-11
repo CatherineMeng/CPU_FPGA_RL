@@ -9,7 +9,11 @@
 #include <iostream>
 #include <fstream>
 #include <CL/cl2.hpp>
-#include "./block.h"
+#include <cstdio>
+#include <cstring>
+// #include <xcl2.hpp>
+#include "./rmm.h"
+
 
 
 // #define N 4
@@ -64,10 +68,12 @@ int main(int argc, char **argv)
     //cl::CommandQueue q(context, device, CL_QUEUE_PROFILING_ENABLE, &err);
     // cl::Kernel krnl_k2r(program, "top", &err); //comment out===========
     // cl::Kernel top_tree(program, "Top_tree", &err);
-    krnl_init = cl::Kernel(program, "initQ", &err)
-    krnl_read1 = cl::Kernel(program, "readQ", &err)
-    krnl_read2 = cl::Kernel(program, "readQ", &err)
-    krnl_write = cl::Kernel(program, "writeQ", &err)
+    // krnl_init = cl::Kernel(program, "initQ", &err)
+    cl::Kernel krnl_init(program, "initQ", &err);
+    cl::Kernel krnl_read1(program, "readQ", &err);
+    cl::Kernel krnl_read2(program, "readQ", &err);
+    cl::Kernel krnl_write(program, "writeQ", &err);
+
 
     // ------------------------------------------------------------------------------------
     // Step 2: Create buffers and initialize test values
@@ -76,9 +82,9 @@ int main(int argc, char **argv)
     // std::vector<int, aligned_allocator<int>> insert_ind_in;
     // insert_ind_in.resize(N);
     std::vector<float, aligned_allocator<float>> pn_in_act; //insertion
-    pn_in.resize(N_actor);
+    pn_in_act.resize(N_actor);
     std::vector<float, aligned_allocator<float>> pn_in_learn; //update
-    pn_in.resize(N_learner);
+    pn_in_learn.resize(N_learner);
     std::vector<int, aligned_allocator<int>> ind_o_out;
     ind_o_out.resize(N_learner);
     
@@ -100,7 +106,7 @@ int main(int argc, char **argv)
     
     cl_mem_ext_ptr_t InExt_act;
     cl_mem_ext_ptr_t InExt_learn;
-    cl_mem_ext_ptr_t CrExt; //for output
+    cl_mem_ext_ptr_t OutExt; //for output
     
 
     InExt_act.obj = pn_in_act.data();
@@ -130,13 +136,13 @@ int main(int argc, char **argv)
     int size_learn=N_learner;
     int i_init=1;
 
-    OCL_CHECK(err, err = krnl_init.setArg(0, i_init));
-    OCL_CHECK(err, err = krnl_read1.setArg(0, inpn_buf_act));
-    OCL_CHECK(err, err = krnl_read1.setArg(2, size_act));
-    OCL_CHECK(err, err = krnl_read2.setArg(0, inpn_buf_learn));
-    OCL_CHECK(err, err = krnl_read2.setArg(2, size_learn));
-    OCL_CHECK(err, err = krnl_write.setArg(1, out_buf));
-    OCL_CHECK(err, err = krnl_write.setArg(2, size_learn));
+    krnl_init.setArg(0, i_init);
+    krnl_read1.setArg(0, inpn_buf_act);
+    krnl_read1.setArg(2, size_act);
+    krnl_read2.setArg(0, inpn_buf_learn);
+    krnl_read2.setArg(2, size_learn);
+    krnl_write.setArg(1, out_buf);
+    krnl_write.setArg(2, size_learn);
 
     printf("setArg finished\n");
     // ------------------------------------------------------------------------------------
@@ -145,25 +151,25 @@ int main(int argc, char **argv)
 
    // Copy input data to device global memory
     std::cout << "Copying data..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({inpn_buf_act}, 0 /*0 means from host*/));
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({inpn_buf_learn}, 0 /*0 means from host*/));
+    q.enqueueMigrateMemObjects({inpn_buf_act}, 0 /*0 means from host*/);
+    q.enqueueMigrateMemObjects({inpn_buf_learn}, 0 /*0 means from host*/);
 
-    OCL_CHECK(err, err = q.finish());
+    q.finish();
 
     // Launch the Kernel
     std::cout << "Launching Kernel..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueTask(krnl_init));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_read1));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_read2));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_write));
+    q.enqueueTask(krnl_init);
+    q.enqueueTask(krnl_read1);
+    q.enqueueTask(krnl_read2);
+    q.enqueueTask(krnl_write);
 
     // wait for all kernels to finish their operations
-    OCL_CHECK(err, err = q.finish());
+    q.finish();
 
     // Copy Result from Device Global Memory to Host Local Memory
     std::cout << "Getting Results..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST));
-    OCL_CHECK(err, err = q.finish());
+    q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.finish();
     // OPENCL HOST CODE AREA END
 
     printf("q.finish\n");
@@ -173,42 +179,42 @@ int main(int argc, char **argv)
     // Step 4: Run the kernel for replay in the loop --- do we only need to change buf or do we need to setarg again for the data transfer to be updated?
     // ------------------------------------------------------------------------------------
 
-    int i_init=0;
+    i_init=0;
     for (k = 0; k < N_actor; k++) {
         pn_in_act[k] = 0.7; //At runtime, should be pn_in_act[i]=queue.pop()...
     }
     for (k = 0; k < N_learner; k++) {
         pn_in_learn[k]=0.7;
     }
-    
-    OCL_CHECK(err, err = krnl_init.setArg(0, i_init));
-    OCL_CHECK(err, err = krnl_read1.setArg(0, inpn_buf_act));
-    OCL_CHECK(err, err = krnl_read1.setArg(2, size_act));
-    OCL_CHECK(err, err = krnl_read2.setArg(0, inpn_buf_learn));
-    OCL_CHECK(err, err = krnl_read2.setArg(2, size_learn));
-    OCL_CHECK(err, err = krnl_write.setArg(1, out_buf));
-    OCL_CHECK(err, err = krnl_write.setArg(2, size_learn));
+
+    krnl_init.setArg(0, i_init);
+    krnl_read1.setArg(0, inpn_buf_act);
+    krnl_read1.setArg(2, size_act);
+    krnl_read2.setArg(0, inpn_buf_learn);
+    krnl_read2.setArg(2, size_learn);
+    krnl_write.setArg(1, out_buf);
+    krnl_write.setArg(2, size_learn);
    // Copy input data to device global memory
     std::cout << "Copying data..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({inpn_buf_act}, 0 /*0 means from host*/));
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({inpn_buf_learn}, 0 /*0 means from host*/));
+    q.enqueueMigrateMemObjects({inpn_buf_act}, 0 /*0 means from host*/);
+    q.enqueueMigrateMemObjects({inpn_buf_learn}, 0 /*0 means from host*/);
 
-    OCL_CHECK(err, err = q.finish());
+    q.finish();
 
     // Launch the Kernel
     std::cout << "Launching Kernel..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueTask(krnl_init));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_read1));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_read2));
-    OCL_CHECK(err, err = q.enqueueTask(krnl_write));
+    q.enqueueTask(krnl_init);
+    q.enqueueTask(krnl_read1);
+    q.enqueueTask(krnl_read2);
+    q.enqueueTask(krnl_write);
 
     // wait for all kernels to finish their operations
-    OCL_CHECK(err, err = q.finish());
+    q.finish();
 
     // Copy Result from Device Global Memory to Host Local Memory
     std::cout << "Getting Results..." << std::endl;
-    OCL_CHECK(err, err = q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST));
-    OCL_CHECK(err, err = q.finish());
+    q.enqueueMigrateMemObjects({out_buf}, CL_MIGRATE_MEM_OBJECT_HOST);
+    q.finish();
     // OPENCL HOST CODE AREA END
 
     printf("q.finish\n");

@@ -2,6 +2,9 @@
 #include "hls_stream.h"
 #include "ap_fixed.h"
 // #include "hls_math.h"
+#include <ap_axi_sdata.h>
+#include <ap_int.h>
+#include <hls_stream.h>
 #include <iostream>
 #include <iomanip>
 #include <vector>
