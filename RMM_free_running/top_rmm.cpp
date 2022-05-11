@@ -129,7 +129,7 @@ void Sib_Iterator_l3(fixed_l3 TLev3[Lev3_Width],hls::stream<sibit_io> &ind_newxi
 // 1. update queue from learner q_lupd (input, read)
 // 2. insertion queue from actor q_insert (input, read)
 // 3. sampling queue sent to data storage (output, write)
-void Top_tree(int init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::stream<ap_axiu<32, 0, 0, 0> >& q_insert, hls::stream<ap_axiu<32, 0, 0, 0> >& q_samp_out){
+void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::stream<ap_axiu<32, 0, 0, 0> >& q_insert, hls::stream<ap_axiu<32, 0, 0, 0> >& q_samp_out){
 // void Top_tree(int insert_signal,int insert_ind,int upd, float pn[],int ind_o[]){
 	#pragma HLS INTERFACE s_axilite port=insert_signal bundle=control
 	#pragma HLS interface ap_ctrl_none port = return
@@ -145,8 +145,7 @@ void Top_tree(int init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::
 
 	//=====================populate tree with 1: initialization=============
 	// Done only once before starting free-running kernel with init_signal=0
-	if (init_signal==1){
-
+	if (!init_signal.empty()){ //This should only happen once
 		for (int j=0;j<Lev3_Width;j++){ //0*4 ~16*4-1 (0123, 0123....64 times)
 			init_fan4.TLev3[j]=0;
 		}
@@ -161,6 +160,7 @@ void Top_tree(int init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::
 		printf("\nTree init done.\n");
 		#endif
 		insert_ind=0;
+		init_signal.read();
 	}
 	
 

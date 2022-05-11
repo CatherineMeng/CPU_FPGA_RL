@@ -18,7 +18,7 @@ const int prefix_s=1;
 #define D 3 //depth without root
 #define N_learner 8 //learning batch size
 #define BS 8 //learning batch size, must be the same as N_learner
-#define N_actor 64 //inf insert batch size
+#define N_actor 32 //inf insert batch size
 
 // #define N_learner 128 //learning batch size
 // #define insert_batch 128 //inf batch size
@@ -72,5 +72,5 @@ void Sib_Iterator_l3(fixed_l3 TLev3[Lev3_Width],hls::stream<sibit_io> &ind_newxi
 //void process_indices(hls::stream<sibit_io> &ind_newxin, int output_indices[],int index_learners);
 //insert signal from cpu, update number from train module
 // void Top_tree(int insert_signal,int *insert_ind,float *init_priority, int update_signal, hls::stream<ap_axiu<32,0,0,0>> &pn_in,int sample_signal,int load_seed,int *ind_o);
-void Top_tree(int init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::stream<ap_axiu<32, 0, 0, 0> >& q_insert, hls::stream<ap_axiu<32, 0, 0, 0> >& q_samp_out);
+void Top_tree(hls::stream<ap_axiu<2, 0, 0, 0> >& init_signal, hls::stream<ap_axiu<32, 0, 0, 0> >& q_lupd, hls::stream<ap_axiu<32, 0, 0, 0> >& q_insert, hls::stream<ap_axiu<32, 0, 0, 0> >& q_samp_out);
 }

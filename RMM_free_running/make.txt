@@ -8,9 +8,13 @@ g++ -Wall -g -std=c++11 ../host.cpp -o app.exe -I${XILINX_XRT}/include/ -I/tools
 emconfigutil --platform xilinx_u200_xdma_201830_2 --nd 1
 
 
-v++ -c -t sw_emu --config ../u200.cfg -k Top_tree -I../ ../top_rmm.cpp -o top.xo
+v++ -c -t sw_emu --config ../u200r.cfg -k Top_tree -I../ ../top_rmm.cpp -o top.xo
+v++ -c -t sw_emu --config ../u200r.cfg -k readQ -I../ ../readQ.cpp -o read1.xo
+v++ -c -t sw_emu --config ../u200r.cfg -k readQ -I../ ../readQ.cpp -o read2.xo
+v++ -c -t sw_emu --config ../u200r.cfg -k initQ -I../ ../initQ.cpp -o init.xo
+v++ -c -t sw_emu --config ../u200r.cfg -k writeQ -I../ ../writeQ.cpp -o write.xo
 
-v++ -l -t sw_emu --config ../u200.cfg ./top.xo -o top.xclbin
+v++ -l -t sw_emu --config ../u200r.cfg ./top.xo ./init.xo ./read1.xo ./read2.xo ./write.xo -o top.xclbin
 
 export XCL_EMULATION_MODE=sw_emu
 
