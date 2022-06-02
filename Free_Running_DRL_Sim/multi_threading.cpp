@@ -27,7 +27,12 @@ void MultiThreading::main_loop(int thread_idx) {
     // record the time and the number of iterations
     auto start = high_resolution_clock::now();
     while (true) {
+        // if (this->m_name=="replay_manager"){
+        //     this->run_one_iteration_fpga();
+        // }
+        // else{ 
         this->run_one_iteration();
+        // }
         num_iterations.at(thread_idx) += 1;
         if (*finish) {
             std::cout << "Thread " << this->m_name << " finishes" << std::endl;

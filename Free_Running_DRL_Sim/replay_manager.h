@@ -9,6 +9,8 @@
 #include "safe_queue.h"
 #include "multi_threading.h"
 
+#include "fpga_rmm.h"
+
 class ReplayManager : public MultiThreading {
 public:
     ReplayManager(std::shared_ptr<std::atomic<bool>> finish,
@@ -24,9 +26,12 @@ public:
 
     void insert_priority(const torch::Tensor &priority) const;
 
-    void run_one_iteration_FPGA(int N_actor, int N_learner, cl::CommandQueue &q, cl::Kernel &krnl_init, cl::Kernel &krnl_read1, cl::Kernel &krnl_read2, cl::Kernel &krnl_write) override;
-    
-    void start_fpga_host_thread(int N_actor, int N_learner, cl::CommandQueue &q, cl::Kernel &krnl_init, cl::Kernel &krnl_read1, cl::Kernel &krnl_read2, cl::Kernel &krnl_write)
+    // void start_fpga_host_thread(int N_actor, int N_learner, cl::CommandQueue &q, cl::Kernel &krnl_init, cl::Kernel &krnl_read1, cl::Kernel &krnl_read2, cl::Kernel &krnl_write, cl::Context context);
+
+    void run_one_iteration() override;
+
+    // void run_one_iteration_fpga(int N_actor, int N_learner, cl::CommandQueue &q, cl::Kernel &krnl_init, cl::Kernel &krnl_read1, cl::Kernel &krnl_read2, cl::Kernel &krnl_write, cl::Context context);
+     // override;
 
 
 private:
@@ -35,6 +40,14 @@ private:
     std::shared_ptr<SafeQueue<Transition>> init_priority_queue;
     int batch_size;
     int capacity;
+
+    // int N_actor,
+    cl::CommandQueue q;
+    cl::Kernel krnl_init;
+    cl::Kernel krnl_read1;
+    cl::Kernel krnl_read2;
+    cl::Kernel krnl_write;
+    cl::Context context;
 };
 
 

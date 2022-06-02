@@ -9,7 +9,30 @@
 #include "data_storage.h"
 #include "learner.h"
 #include "replay_manager.h"
-#include "fpha_rmm.h" //for FPGA array init.
+// #include "fpga_rmm.h" //for FPGA array init.
+#define CL_HPP_CL_1_2_DEFAULT_BUILD
+#define CL_HPP_TARGET_OPENCL_VERSION 120
+#define CL_HPP_MINIMUM_OPENCL_VERSION 120
+#define CL_HPP_ENABLE_PROGRAM_CONSTRUCTION_FROM_ARRAY_COMPATIBILITY 1
+#define CL_USE_DEPRECATED_OPENCL_1_2_APIS
+
+
+#include <unistd.h>
+#include <iostream>
+#include <fstream>
+#include <CL/cl2.hpp>
+#include <cstdio>
+#include <cstring>
+// #include <xcl2.hpp>
+
+// =================rmm.h for kernel========================
+#include "hls_stream.h"
+#include "ap_fixed.h"
+// #include "hls_math.h"
+#include <ap_axi_sdata.h>
+#include <ap_int.h>
+#include <hls_stream.h>
+#include <iomanip>
 
 
 #include <pybind11/pybind11.h>
@@ -78,12 +101,12 @@ public:
         replay_manager->set_name("replay_manager");
         this->num_actors = num_actors;
 
-
+        /*
         // ------------------------------------------------------------------------------------
-        // Step 0: Initialize the OpenCL environment
+        // FPGA: Initialize the OpenCL environment
         // ------------------------------------------------------------------------------------
         cl_int err;
-        std::string binaryFile = (argc != 2) ? "top.xclbin" : argv[1];
+        std::string binaryFile = "top.xclbin";
         unsigned fileBufSize;
         std::vector<cl::Device> devices = get_xilinx_devices();
         devices.resize(1);
@@ -101,8 +124,7 @@ public:
         cl::Kernel krnl_read1(program, "readQ", &err);
         cl::Kernel krnl_read2(program, "readQ", &err);
         cl::Kernel krnl_write(program, "writeQ", &err);
-
-        
+        */
 
     }
 
@@ -112,9 +134,7 @@ public:
         actor->start_threads(this->num_actors);
         data_storage->start_threads(1);
         learner->start_threads(1);
-        // replay_manager->start_threads(1); //for CPU/GPU
-        replay_manager->start_fpga_host_thread(num_actors,batch_size,q,krnl_init,krnl_read1,krnl_read2,krnl_write); //for FPGA
-
+        replay_manager->start_threads(1);
     }
 
     void end() {
