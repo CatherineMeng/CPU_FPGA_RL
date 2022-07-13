@@ -1,1 +1,1 @@
-# Hetero_Reinforecment_Learning_Acceleration
+# Hetero_Reinforcement_Learning_Acceleration
